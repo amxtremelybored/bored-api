@@ -8,13 +8,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
-import java.util.UUID;
 
-public interface UserProfileRepository extends JpaRepository<UserProfile, UUID> {
+public interface UserProfileRepository extends JpaRepository<UserProfile, Long> {
+
+    Optional<UserProfile> findByIdAndStatusNot(Long id, ProfileStatus status);
 
     Page<UserProfile> findByStatusNot(ProfileStatus status, Pageable pageable);
-
-    Optional<UserProfile> findByIdAndStatusNot(UUID id, ProfileStatus status);
 
     Optional<UserProfile> findByUidAndStatusNot(String uid, ProfileStatus status);
 }

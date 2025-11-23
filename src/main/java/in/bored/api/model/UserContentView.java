@@ -16,13 +16,20 @@ public class UserContentView {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // user
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_profile_id", nullable = false)
     private UserProfile userProfile;
 
+    // content
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "topic_content_id", nullable = false)
     private TopicContent topicContent;
+
+    // direct topic reference
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "topic_id", nullable = false)
+    private Topic topic;
 
     @Column(name = "viewed_at", updatable = false)
     private OffsetDateTime viewedAt;
@@ -41,6 +48,9 @@ public class UserContentView {
 
     public TopicContent getTopicContent() { return topicContent; }
     public void setTopicContent(TopicContent topicContent) { this.topicContent = topicContent; }
+
+    public Topic getTopic() { return topic; }
+    public void setTopic(Topic topic) { this.topic = topic; }
 
     public OffsetDateTime getViewedAt() { return viewedAt; }
     public void setViewedAt(OffsetDateTime viewedAt) { this.viewedAt = viewedAt; }

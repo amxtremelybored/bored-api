@@ -4,25 +4,26 @@ package in.bored.api.model;
 import jakarta.persistence.*;
 
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(
         name = "user_preferences",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"user_profile_id", "topic_id"})
+        uniqueConstraints = @UniqueConstraint(columnNames = {"user_profile_id", "category_id"})
 )
 public class UserPreference {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;  // simple numeric PK
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_profile_id", nullable = false)
     private UserProfile userProfile;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "topic_id", nullable = false)
-    private Topic topic;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", nullable = false)
+    private ContentCategory category;
 
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
@@ -39,9 +40,14 @@ public class UserPreference {
     public UserProfile getUserProfile() { return userProfile; }
     public void setUserProfile(UserProfile userProfile) { this.userProfile = userProfile; }
 
-    public Topic getTopic() { return topic; }
-    public void setTopic(Topic topic) { this.topic = topic; }
+    public ContentCategory getCategory() { return category; }
+    public void setCategory(ContentCategory category) { this.category = category; }
 
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+
+    // convenience accessors if needed
+    public UUID getCategoryId() {
+        return category != null ? category.getId() : null;
+    }
 }

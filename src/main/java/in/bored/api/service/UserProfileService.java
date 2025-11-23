@@ -11,8 +11,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
-
 @Service
 public class UserProfileService {
 
@@ -22,14 +20,16 @@ public class UserProfileService {
         this.userProfileRepository = userProfileRepository;
     }
 
+    // Admin create by id (not often needed if you use upsert)
     public UserProfile create(UserProfileRequest request) {
         UserProfile profile = new UserProfile();
-        profile.setId(UUID.randomUUID());
+        profile.setStatus(ProfileStatus.ACTIVE);
+        // id is auto-generated (IDENTITY) -> do NOT set manually
         applyRequest(profile, request);
         return userProfileRepository.save(profile);
     }
 
-    public UserProfile getById(UUID id) {
+    public UserProfile getById(Long id) {
         return userProfileRepository.findByIdAndStatusNot(id, ProfileStatus.DELETED)
                 .orElseThrow(() -> new ResourceNotFoundException("UserProfile not found: " + id));
     }
@@ -38,17 +38,19 @@ public class UserProfileService {
         return userProfileRepository.findByStatusNot(ProfileStatus.DELETED, pageable);
     }
 
-    public UserProfile update(UUID id, UserProfileRequest request) {
+    public UserProfile update(Long id, UserProfileRequest request) {
         UserProfile profile = getById(id);
         applyRequest(profile, request);
         return userProfileRepository.save(profile);
     }
 
-    public void softDelete(UUID id) {
+    public void softDelete(Long id) {
         UserProfile profile = getById(id);
         profile.setStatus(ProfileStatus.DELETED);
         userProfileRepository.save(profile);
     }
+
+    // -------- Firebase UID based methods --------
 
     public UserProfile getByUid(String uid) {
         return userProfileRepository.findByUidAndStatusNot(uid, ProfileStatus.DELETED)
@@ -60,6 +62,10 @@ public class UserProfileService {
         return getByUid(uid);
     }
 
+    /**
+     * Upsert profile for the current Firebase user.
+     * Uses Firebase UID from SecurityContext as uid & firebaseUid.
+     */
     public UserProfile upsertCurrentUserProfile(UserProfileRequest request) {
         String firebaseUid = getCurrentUid();
 
@@ -67,9 +73,8 @@ public class UserProfileService {
                 .findByUidAndStatusNot(firebaseUid, ProfileStatus.DELETED)
                 .orElseGet(() -> {
                     UserProfile p = new UserProfile();
-                    p.setId(UUID.randomUUID());
-                    p.setUid(firebaseUid);
-                    p.setFirebaseUid(firebaseUid);
+                    p.setUid(firebaseUid);          // MAIN UID = Firebase UID
+                    p.setFirebaseUid(firebaseUid);  // store in firebase_uid column too
                     p.setStatus(ProfileStatus.ACTIVE);
                     return p;
                 });
@@ -78,11 +83,14 @@ public class UserProfileService {
         return userProfileRepository.save(profile);
     }
 
+    // -------- helpers --------
+
     private String getCurrentUid() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getPrincipal() == null) {
             throw new IllegalStateException("No authenticated user found");
         }
+        // principal MUST be Firebase UID (see FirebaseAuthenticationFilter)
         return auth.getPrincipal().toString();
     }
 

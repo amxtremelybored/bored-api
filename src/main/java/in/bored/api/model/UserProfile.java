@@ -1,101 +1,143 @@
 // src/main/java/in/bored/api/model/UserProfile.java
 package in.bored.api.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 
 @Entity
 @Table(name = "user_profiles")
 public class UserProfile {
 
     @Id
-    @Column(columnDefinition = "uuid")
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // <-- Long / bigserial PK
+    @Column(name = "id")
+    private Long id;
 
-    @Column(name = "uid", unique = true)
-    private String uid;              // Firebase UID (or same as firebaseUid)
+    // Firebase UID we use to look up profile
+    @Column(name = "uid", nullable = false, unique = true, length = 128)
+    private String uid;
+
+    @Column(name = "firebase_uid", nullable = false, length = 128)
+    private String firebaseUid;
 
     @Column(name = "display_name")
     private String displayName;
 
+    @Column(name = "age")
     private Integer age;
+
+    @Column(name = "phone", length = 32)
     private String phone;
+
+    @Column(name = "email", length = 255)
     private String email;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status")
-    private ProfileStatus status = ProfileStatus.ACTIVE;
-
-    @Column(name = "created_at", updatable = false)
-    private OffsetDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private OffsetDateTime updatedAt;
-
-    @Column(name = "firebase_uid")
-    private String firebaseUid;
-
-    @Column(name = "photo_url")
+    @Column(name = "photo_url", length = 1024)
     private String photoUrl;
 
-    @OneToMany(mappedBy = "userProfile", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonIgnore
-    private List<UserPreference> preferences = new ArrayList<>();
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 32)
+    private ProfileStatus status = ProfileStatus.ACTIVE;
 
-    @PrePersist
-    public void prePersist() {
-        OffsetDateTime now = OffsetDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-        if (this.status == null) {
-            this.status = ProfileStatus.ACTIVE;
-        }
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private OffsetDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private OffsetDateTime updatedAt;
+
+    // -------- getters & setters --------
+
+    public Long getId() {
+        return id;
     }
 
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = OffsetDateTime.now();
+    // usually no need to setId manually, but keep setter for JPA if needed
+    public void setId(Long id) {
+        this.id = id;
     }
 
-    // getters/setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    public String getUid() {
+        return uid;
+    }
 
-    public String getUid() { return uid; }
-    public void setUid(String uid) { this.uid = uid; }
+    public void setUid(String uid) {
+        this.uid = uid;
+    }
 
-    public String getDisplayName() { return displayName; }
-    public void setDisplayName(String displayName) { this.displayName = displayName; }
+    public String getFirebaseUid() {
+        return firebaseUid;
+    }
 
-    public Integer getAge() { return age; }
-    public void setAge(Integer age) { this.age = age; }
+    public void setFirebaseUid(String firebaseUid) {
+        this.firebaseUid = firebaseUid;
+    }
 
-    public String getPhone() { return phone; }
-    public void setPhone(String phone) { this.phone = phone; }
+    public String getDisplayName() {
+        return displayName;
+    }
 
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
 
-    public ProfileStatus getStatus() { return status; }
-    public void setStatus(ProfileStatus status) { this.status = status; }
+    public Integer getAge() {
+        return age;
+    }
 
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+    public void setAge(Integer age) {
+        this.age = age;
+    }
 
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public String getPhone() {
+        return phone;
+    }
 
-    public String getFirebaseUid() { return firebaseUid; }
-    public void setFirebaseUid(String firebaseUid) { this.firebaseUid = firebaseUid; }
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
 
-    public String getPhotoUrl() { return photoUrl; }
-    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
+    public String getEmail() {
+        return email;
+    }
 
-    public List<UserPreference> getPreferences() { return preferences; }
-    public void setPreferences(List<UserPreference> preferences) { this.preferences = preferences; }
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPhotoUrl() {
+        return photoUrl;
+    }
+
+    public void setPhotoUrl(String photoUrl) {
+        this.photoUrl = photoUrl;
+    }
+
+    public ProfileStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(ProfileStatus status) {
+        this.status = status;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(OffsetDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(OffsetDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }

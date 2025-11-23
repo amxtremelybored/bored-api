@@ -2,11 +2,12 @@
 package in.bored.api.dto;
 
 import java.util.List;
+import java.util.UUID;
 
 public class UserPreferenceBulkRequest {
 
-    private List<Long> topicIds;
+    private List<UUID> categoryIds;
 
-    public List<Long> getTopicIds() { return topicIds; }
-    public void setTopicIds(List<Long> topicIds) { this.topicIds = topicIds; }
+    public List<UUID> getCategoryIds() { return categoryIds; }
+    public void setCategoryIds(List<UUID> categoryIds) { this.categoryIds = categoryIds; }
 }

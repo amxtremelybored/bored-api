@@ -5,13 +5,10 @@ import in.bored.api.dto.UserProfileRequest;
 import in.bored.api.model.UserProfile;
 import in.bored.api.service.UserProfileService;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/user-profiles")
@@ -30,44 +27,40 @@ public class UserProfileController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<UserProfile> getById(@PathVariable UUID id) {
+    public ResponseEntity<UserProfile> getById(@PathVariable Long id) {
         UserProfile profile = userProfileService.getById(id);
         return ResponseEntity.ok(profile);
     }
 
     @GetMapping
-    public ResponseEntity<Page<UserProfile>> list(
-            @RequestParam(name = "page", defaultValue = "0") int page,
-            @RequestParam(name = "size", defaultValue = "20") int size
-    ) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<UserProfile> result = userProfileService.list(pageable);
-        return ResponseEntity.ok(result);
+    public ResponseEntity<Page<UserProfile>> list(Pageable pageable) {
+        Page<UserProfile> page = userProfileService.list(pageable);
+        return ResponseEntity.ok(page);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<UserProfile> update(
-            @PathVariable UUID id,
-            @RequestBody UserProfileRequest request
-    ) {
+    public ResponseEntity<UserProfile> update(@PathVariable Long id,
+                                              @RequestBody UserProfileRequest request) {
         UserProfile updated = userProfileService.update(id, request);
         return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> softDelete(@PathVariable UUID id) {
+    public ResponseEntity<Void> softDelete(@PathVariable Long id) {
         userProfileService.softDelete(id);
         return ResponseEntity.noContent().build();
     }
 
+    // Firebase UID based endpoints
+
     @GetMapping("/me")
-    public ResponseEntity<UserProfile> getCurrentUserProfile() {
+    public ResponseEntity<UserProfile> getMe() {
         UserProfile profile = userProfileService.getCurrentUserProfile();
         return ResponseEntity.ok(profile);
     }
 
-    @PostMapping("/me")
-    public ResponseEntity<UserProfile> upsertCurrentUserProfile(@RequestBody UserProfileRequest request) {
+    @PutMapping("/me")
+    public ResponseEntity<UserProfile> upsertMe(@RequestBody UserProfileRequest request) {
         UserProfile profile = userProfileService.upsertCurrentUserProfile(request);
         return ResponseEntity.ok(profile);
     }

@@ -21,36 +21,31 @@ public class UserPreferenceController {
         this.userPreferenceService = userPreferenceService;
     }
 
-    // CREATE single preference for CURRENT user
     @PostMapping
     public ResponseEntity<UserPreference> create(@RequestBody UserPreferenceRequest request) {
         UserPreference created = userPreferenceService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    // BULK CREATE for CURRENT user (multiple topicIds)
     @PostMapping("/bulk")
     public ResponseEntity<List<UserPreference>> createBulk(@RequestBody UserPreferenceBulkRequest request) {
         List<UserPreference> created =
-                userPreferenceService.addPreferencesForCurrentUser(request.getTopicIds());
+                userPreferenceService.addPreferencesForCurrentUser(request.getCategoryIds());
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    // READ ONE by preference id
     @GetMapping("/{id}")
     public ResponseEntity<UserPreference> getById(@PathVariable Long id) {
         UserPreference pref = userPreferenceService.getById(id);
         return ResponseEntity.ok(pref);
     }
 
-    // LIST preferences for CURRENT user
     @GetMapping("/me")
     public ResponseEntity<List<UserPreference>> getCurrentUserPreferences() {
         List<UserPreference> prefs = userPreferenceService.getCurrentUserPreferences();
         return ResponseEntity.ok(prefs);
     }
 
-    // DELETE (hard)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         userPreferenceService.delete(id);

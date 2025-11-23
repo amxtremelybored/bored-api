@@ -13,6 +13,7 @@ public class ContentItemResponse {
     private String content;
     private OffsetDateTime createdAt;
 
+    // getters/setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

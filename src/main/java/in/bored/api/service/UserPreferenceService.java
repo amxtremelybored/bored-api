@@ -3,51 +3,56 @@ package in.bored.api.service;
 
 import in.bored.api.dto.UserPreferenceBulkRequest;
 import in.bored.api.dto.UserPreferenceRequest;
+import in.bored.api.model.ContentCategory;
 import in.bored.api.model.ProfileStatus;
-import in.bored.api.model.Topic;
 import in.bored.api.model.UserPreference;
 import in.bored.api.model.UserProfile;
-import in.bored.api.repo.TopicRepository;
+import in.bored.api.repo.ContentCategoryRepository;
 import in.bored.api.repo.UserPreferenceRepository;
 import in.bored.api.repo.UserProfileRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.UUID;
 
 @Service
 public class UserPreferenceService {
 
     private final UserPreferenceRepository userPreferenceRepository;
     private final UserProfileRepository userProfileRepository;
-    private final TopicRepository topicRepository;
+    private final ContentCategoryRepository contentCategoryRepository;
 
     public UserPreferenceService(UserPreferenceRepository userPreferenceRepository,
                                  UserProfileRepository userProfileRepository,
-                                 TopicRepository topicRepository) {
+                                 ContentCategoryRepository contentCategoryRepository) {
         this.userPreferenceRepository = userPreferenceRepository;
         this.userProfileRepository = userProfileRepository;
-        this.topicRepository = topicRepository;
+        this.contentCategoryRepository = contentCategoryRepository;
     }
 
-    // Create single preference for CURRENT user
     public UserPreference create(UserPreferenceRequest request) {
+        if (request.getCategoryId() == null) {
+            throw new IllegalArgumentException("categoryId is required");
+        }
+
         UserProfile profile = getCurrentUserProfile();
 
-        Topic topic = topicRepository.findById(request.getTopicId())
-                .orElseThrow(() -> new ResourceNotFoundException("Topic not found: " + request.getTopicId()));
+        UUID categoryId = request.getCategoryId();
+        ContentCategory category = contentCategoryRepository.findById(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("ContentCategory not found: " + categoryId));
 
-        userPreferenceRepository.findByUserProfileAndTopic(profile, topic)
+        userPreferenceRepository.findByUserProfileAndCategory(profile, category)
                 .ifPresent(existing -> {
-                    throw new IllegalStateException("Preference already exists for this user and topic");
+                    throw new IllegalStateException("Preference already exists for this user and category");
                 });
 
         UserPreference pref = new UserPreference();
         pref.setUserProfile(profile);
-        pref.setTopic(topic);
+        pref.setCategory(category);
 
         return userPreferenceRepository.save(pref);
     }
@@ -57,7 +62,6 @@ public class UserPreferenceService {
                 .orElseThrow(() -> new ResourceNotFoundException("UserPreference not found: " + id));
     }
 
-    // Get all preferences for CURRENT user
     public List<UserPreference> getCurrentUserPreferences() {
         UserProfile profile = getCurrentUserProfile();
         return userPreferenceRepository.findByUserProfile(profile);
@@ -68,26 +72,32 @@ public class UserPreferenceService {
         userPreferenceRepository.delete(pref);
     }
 
-    // Bulk add multiple topics for CURRENT user
-    public List<UserPreference> addPreferencesForCurrentUser(List<Long> topicIds) {
+    public List<UserPreference> addPreferencesForCurrentUser(List<UUID> categoryIds) {
+        if (categoryIds == null || categoryIds.isEmpty()) {
+            throw new IllegalArgumentException("categoryIds must not be empty");
+        }
+        if (categoryIds.stream().anyMatch(id -> id == null)) {
+            throw new IllegalArgumentException("categoryIds must not contain null");
+        }
+
         UserProfile profile = getCurrentUserProfile();
 
-        List<Topic> topics = topicRepository.findAllById(topicIds);
-        if (topics.size() != topicIds.size()) {
-            throw new ResourceNotFoundException("One or more topicIds are invalid");
+        List<ContentCategory> categories = contentCategoryRepository.findAllById(categoryIds);
+        if (categories.size() != new HashSet<>(categoryIds).size()) {
+            throw new ResourceNotFoundException("One or more categoryIds are invalid");
         }
 
         List<UserPreference> existing = userPreferenceRepository.findByUserProfile(profile);
-        Set<Long> existingTopicIds = existing.stream()
-                .map(p -> p.getTopic().getId())
-                .collect(Collectors.toSet());
+        Set<UUID> existingCategoryIds = existing.stream()
+                .map(p -> p.getCategory().getId())
+                .collect(java.util.stream.Collectors.toSet());
 
-        List<UserPreference> newPrefs = topics.stream()
-                .filter(t -> !existingTopicIds.contains(t.getId()))
-                .map(t -> {
+        List<UserPreference> newPrefs = categories.stream()
+                .filter(c -> !existingCategoryIds.contains(c.getId()))
+                .map(c -> {
                     UserPreference p = new UserPreference();
                     p.setUserProfile(profile);
-                    p.setTopic(t);
+                    p.setCategory(c);
                     return p;
                 })
                 .toList();
@@ -100,7 +110,8 @@ public class UserPreferenceService {
     private UserProfile getCurrentUserProfile() {
         String uid = getCurrentUid();
         return userProfileRepository.findByUidAndStatusNot(uid, ProfileStatus.DELETED)
-                .orElseThrow(() -> new ResourceNotFoundException("UserProfile not found or deleted for uid: " + uid));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("UserProfile not found or deleted for uid: " + uid));
     }
 
     private String getCurrentUid() {

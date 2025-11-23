@@ -17,8 +17,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class ContentFeedService {
@@ -57,7 +55,7 @@ public class ContentFeedService {
 
         Pageable pageable = PageRequest.of(0, size);
 
-        // 3) Find unseen content for this user across those topics
+        // 3) Unseen content
         List<TopicContent> contents =
                 topicContentRepository.findNextUnseenForUser(profile, topics, pageable);
 
@@ -65,27 +63,28 @@ public class ContentFeedService {
             return Collections.emptyList();
         }
 
-        // 4) Mark as viewed (so they won't be shown again)
+        // 4) Save views (store topic too)
         List<UserContentView> views = contents.stream()
                 .map(c -> {
                     UserContentView v = new UserContentView();
                     v.setUserProfile(profile);
                     v.setTopicContent(c);
+                    v.setTopic(c.getTopic());
                     return v;
                 })
                 .toList();
 
         userContentViewRepository.saveAll(views);
 
-        // 5) Map to response DTO
+        // 5) Map DTOs
         return contents.stream()
                 .map(this::toResponse)
                 .toList();
     }
 
     private List<Topic> resolveTopics(UserProfile profile, List<Long> topicIds) {
+        // Case 1: explicit topicIds
         if (topicIds != null && !topicIds.isEmpty()) {
-            // use only requested topics
             List<Topic> topics = topicRepository.findAllById(topicIds);
             if (topics.size() != topicIds.size()) {
                 throw new ResourceNotFoundException("One or more topicIds are invalid");
@@ -93,12 +92,22 @@ public class ContentFeedService {
             return topics;
         }
 
-        // else: use topics from user_preferences
+        // Case 2: category-based from user preferences
         List<UserPreference> prefs = userPreferenceRepository.findByUserProfile(profile);
-        return prefs.stream()
-                .map(UserPreference::getTopic)
+        if (prefs.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<ContentCategory> categories = prefs.stream()
+                .map(UserPreference::getCategory)
                 .distinct()
                 .toList();
+
+        if (categories.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return topicRepository.findByCategoryIn(categories);
     }
 
     private ContentItemResponse toResponse(TopicContent c) {
@@ -116,7 +125,8 @@ public class ContentFeedService {
     private UserProfile getCurrentUserProfile() {
         String uid = getCurrentUid();
         return userProfileRepository.findByUidAndStatusNot(uid, ProfileStatus.DELETED)
-                .orElseThrow(() -> new ResourceNotFoundException("UserProfile not found or deleted for uid: " + uid));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("UserProfile not found or deleted for uid: " + uid));
     }
 
     private String getCurrentUid() {

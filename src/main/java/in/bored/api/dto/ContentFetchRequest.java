@@ -5,10 +5,7 @@ import java.util.List;
 
 public class ContentFetchRequest {
 
-    // Optional: if null/empty -> use user's preferences
     private List<Long> topicIds;
-
-    // How many content items to fetch (default in service if null)
     private Integer size;
 
     public List<Long> getTopicIds() { return topicIds; }

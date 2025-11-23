@@ -1,10 +1,12 @@
 // src/main/java/in/bored/api/dto/UserPreferenceRequest.java
 package in.bored.api.dto;
 
+import java.util.UUID;
+
 public class UserPreferenceRequest {
 
-    private Long topicId;
+    private UUID categoryId;
 
-    public Long getTopicId() { return topicId; }
-    public void setTopicId(Long topicId) { this.topicId = topicId; }
+    public UUID getCategoryId() { return categoryId; }
+    public void setCategoryId(UUID categoryId) { this.categoryId = categoryId; }
 }

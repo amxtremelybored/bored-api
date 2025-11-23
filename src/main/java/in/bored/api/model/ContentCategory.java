@@ -1,21 +1,26 @@
-// src/main/java/in/bored/api/model/Topic.java
+// src/main/java/in/bored/api/model/ContentCategory.java
 package in.bored.api.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 @Entity
-@Table(name = "topics")
-public class Topic {
+@Table(name = "content_category")
+public class ContentCategory {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue
+    @Column(name = "id", columnDefinition = "uuid")
+    private UUID id;
 
-    @Column(nullable = false)
+    @Column(name = "name", nullable = false, unique = true, length = 255)
     private String name;
 
+    @Column(name = "emoji", length = 16)
     private String emoji;
 
     @Column(name = "is_content_loaded", nullable = false)
@@ -24,31 +29,36 @@ public class Topic {
     @Column(name = "content_loaded_at")
     private OffsetDateTime contentLoadedAt;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id")   // FK -> content_category.id (UUID)
-    private ContentCategory category;
-
-    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
-    @PrePersist
-    public void prePersist() {
-        OffsetDateTime now = OffsetDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
+    public ContentCategory() {
     }
 
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = OffsetDateTime.now();
+    public ContentCategory(UUID id,
+                           String name,
+                           String emoji,
+                           boolean contentLoaded,
+                           OffsetDateTime contentLoadedAt,
+                           OffsetDateTime createdAt,
+                           OffsetDateTime updatedAt) {
+        this.id = id;
+        this.name = name;
+        this.emoji = emoji;
+        this.contentLoaded = contentLoaded;
+        this.contentLoadedAt = contentLoadedAt;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
     }
 
     // getters/setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
@@ -61,9 +71,6 @@ public class Topic {
 
     public OffsetDateTime getContentLoadedAt() { return contentLoadedAt; }
     public void setContentLoadedAt(OffsetDateTime contentLoadedAt) { this.contentLoadedAt = contentLoadedAt; }
-
-    public ContentCategory getCategory() { return category; }
-    public void setCategory(ContentCategory category) { this.category = category; }
 
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
