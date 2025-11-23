@@ -1,0 +1,48 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.0.0'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'in.bored.api'
+version = '0.0.1-SNAPSHOT'
+description = 'bored-api'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // 🌱 Core Spring Boot
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    // 🐘 PostgreSQL
+    runtimeOnly 'org.postgresql:postgresql'
+    // 🔥 Firebase Admin SDK
+    implementation 'com.google.firebase:firebase-admin:9.3.0'
+    // 🧱 Flyway (core + PostgreSQL)
+    implementation 'org.flywaydb:flyway-core:10.16.0'
+    implementation 'org.flywaydb:flyway-database-postgresql:10.16.0'
+    // 💡 Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    // 🧪 Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+    testImplementation "org.hamcrest:hamcrest:2.2"
+
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

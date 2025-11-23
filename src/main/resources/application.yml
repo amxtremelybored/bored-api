@@ -1,0 +1,17 @@
+server:
+  port: 7082
+  address: 0.0.0.0
+spring:
+  datasource:
+    url: jdbc:postgresql://192.168.4.44:5432/bored
+    username: postgres
+    password: secret123
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      keepalive-time: 300000   # 5 min ping to prevent idle disconnects
+      validation-timeout: 5000 # safety timeout
+      leak-detection-threshold: 60000 # optional, 60s for debugging
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
