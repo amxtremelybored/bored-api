@@ -1,7 +1,6 @@
 // src/main/java/in/bored/api/service/UserPreferenceService.java
 package in.bored.api.service;
 
-import in.bored.api.dto.UserPreferenceBulkRequest;
 import in.bored.api.dto.UserPreferenceRequest;
 import in.bored.api.model.ContentCategory;
 import in.bored.api.model.ProfileStatus;
@@ -13,6 +12,7 @@ import in.bored.api.repo.UserProfileRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.List;
@@ -72,6 +72,9 @@ public class UserPreferenceService {
         userPreferenceRepository.delete(pref);
     }
 
+    /**
+     * ADD-ONLY bulk (old behaviour) – you can keep this if you still need it somewhere.
+     */
     public List<UserPreference> addPreferencesForCurrentUser(List<UUID> categoryIds) {
         if (categoryIds == null || categoryIds.isEmpty()) {
             throw new IllegalArgumentException("categoryIds must not be empty");
@@ -94,6 +97,45 @@ public class UserPreferenceService {
 
         List<UserPreference> newPrefs = categories.stream()
                 .filter(c -> !existingCategoryIds.contains(c.getId()))
+                .map(c -> {
+                    UserPreference p = new UserPreference();
+                    p.setUserProfile(profile);
+                    p.setCategory(c);
+                    return p;
+                })
+                .toList();
+
+        return userPreferenceRepository.saveAll(newPrefs);
+    }
+
+    /**
+     * NEW: Replace the user's preferences with EXACTLY the given categoryIds.
+     * If the list is empty, all prefs will be deleted.
+     */
+    @Transactional
+    public List<UserPreference> replacePreferencesForCurrentUser(List<UUID> categoryIds) {
+        UserProfile profile = getCurrentUserProfile();
+
+        // 1) Clear existing preferences for this user
+        userPreferenceRepository.deleteByUserProfile(profile);
+
+        // If list is empty → user has no explicit preferences now
+        if (categoryIds == null || categoryIds.isEmpty()) {
+            return List.of();
+        }
+
+        // 2) Validate categories
+        if (categoryIds.stream().anyMatch(id -> id == null)) {
+            throw new IllegalArgumentException("categoryIds must not contain null");
+        }
+
+        List<ContentCategory> categories = contentCategoryRepository.findAllById(categoryIds);
+        if (categories.size() != new HashSet<>(categoryIds).size()) {
+            throw new ResourceNotFoundException("One or more categoryIds are invalid");
+        }
+
+        // 3) Create & save new preferences
+        List<UserPreference> newPrefs = categories.stream()
                 .map(c -> {
                     UserPreference p = new UserPreference();
                     p.setUserProfile(profile);

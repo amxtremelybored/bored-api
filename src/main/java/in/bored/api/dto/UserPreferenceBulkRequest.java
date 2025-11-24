@@ -5,9 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 public class UserPreferenceBulkRequest {
-
     private List<UUID> categoryIds;
-
     public List<UUID> getCategoryIds() { return categoryIds; }
     public void setCategoryIds(List<UUID> categoryIds) { this.categoryIds = categoryIds; }
 }

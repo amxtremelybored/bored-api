@@ -15,4 +15,5 @@ public interface UserPreferenceRepository extends JpaRepository<UserPreference, 
 
     Optional<UserPreference> findByUserProfileAndCategory(UserProfile userProfile,
                                                           ContentCategory category);
+    void deleteByUserProfile(UserProfile profile);
 }

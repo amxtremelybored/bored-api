@@ -27,11 +27,21 @@ public class UserPreferenceController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
+    /**
+     * Bulk REPLACE: overwrite the current user's preferences
+     * with exactly the given categoryIds.
+     */
     @PostMapping("/bulk")
-    public ResponseEntity<List<UserPreference>> createBulk(@RequestBody UserPreferenceBulkRequest request) {
-        List<UserPreference> created =
-                userPreferenceService.addPreferencesForCurrentUser(request.getCategoryIds());
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    public ResponseEntity<List<UserPreference>> createBulk(
+            @RequestBody UserPreferenceBulkRequest request
+    ) {
+        List<UserPreference> replaced =
+                userPreferenceService.replacePreferencesForCurrentUser(
+                        request.getCategoryIds() == null
+                                ? List.of()
+                                : request.getCategoryIds()
+                );
+        return ResponseEntity.ok(replaced);
     }
 
     @GetMapping("/{id}")
