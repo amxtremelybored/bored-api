@@ -24,7 +24,6 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-                // if you don't use form login / basic auth, it's nice to disable them too:
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .formLogin(form -> form.disable())
                 .authorizeHttpRequests(auth -> auth
@@ -35,6 +34,11 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/error"
                         ).permitAll()
+
+                        // 🆓 GUEST endpoint → no auth required
+                        .requestMatchers("/api/content/guest-next").permitAll()
+
+                        // everything else requires Firebase auth
                         .anyRequest().authenticated()
                 )
                 // ✅ Authenticate Firebase token before Spring's UsernamePasswordAuthenticationFilter

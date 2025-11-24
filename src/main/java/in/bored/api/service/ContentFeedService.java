@@ -3,6 +3,7 @@ package in.bored.api.service;
 
 import in.bored.api.dto.ContentFetchRequest;
 import in.bored.api.dto.ContentItemResponse;
+import in.bored.api.dto.GuestContentFetchRequest;
 import in.bored.api.model.*;
 import in.bored.api.repo.TopicContentRepository;
 import in.bored.api.repo.TopicRepository;
@@ -39,6 +40,9 @@ public class ContentFeedService {
         this.userContentViewRepository = userContentViewRepository;
     }
 
+    // ---------------------------------------------------------
+    // 1) EXISTING: logged-in user feed (unseen, user prefs, views)
+    // ---------------------------------------------------------
     public List<ContentItemResponse> fetchNextForCurrentUser(ContentFetchRequest request) {
         UserProfile profile = getCurrentUserProfile();
 
@@ -81,6 +85,44 @@ public class ContentFeedService {
                 .map(this::toResponse)
                 .toList();
     }
+
+    // ---------------------------------------------------------
+    // 2) NEW: guest feed → random content, NO user, NO prefs, NO views
+    // ---------------------------------------------------------
+    public List<ContentItemResponse> fetchRandomForGuest(GuestContentFetchRequest request) {
+        // Defensive defaults if request is null
+        List<Long> topicIds = (request != null) ? request.getTopicIds() : null;
+        int size = (request != null && request.getSize() != null && request.getSize() > 0)
+                ? request.getSize()
+                : 5;
+
+        Pageable pageable = PageRequest.of(0, size);
+
+        List<TopicContent> contents;
+
+        // Case 1: restrict to specific topics (if provided)
+        if (topicIds != null && !topicIds.isEmpty()) {
+            List<Topic> topics = topicRepository.findAllById(topicIds);
+            if (topics.isEmpty()) {
+                return Collections.emptyList();
+            }
+            contents = topicContentRepository.findRandomByTopicIn(topics, pageable);
+        } else {
+            // Case 2: fully random across all topics
+            contents = topicContentRepository.findRandom(pageable);
+        }
+
+        if (contents == null || contents.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // IMPORTANT: we DO NOT store UserContentView here → totally stateless
+        return contents.stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // ----------------- existing helpers below -----------------
 
     private List<Topic> resolveTopics(UserProfile profile, List<Long> topicIds) {
         // Case 1: explicit topicIds
