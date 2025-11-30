@@ -1,6 +1,7 @@
 // src/main/java/in/bored/api/controller/ContentFeedController.java
 package in.bored.api.controller;
 
+import in.bored.api.dto.ContentEmptyMetaResponse;
 import in.bored.api.dto.ContentFetchRequest;
 import in.bored.api.dto.ContentItemResponse;
 import in.bored.api.dto.GuestContentFetchRequest;
@@ -28,6 +29,16 @@ public class ContentFeedController {
         List<ContentItemResponse> items =
                 contentFeedService.fetchNextForCurrentUser(request);
         return ResponseEntity.ok(items);
+    }
+
+    // 🧠 When /next returns [], client can call this to get prefs + topics
+    @PostMapping("/next/meta")
+    public ResponseEntity<ContentEmptyMetaResponse> getNextContentMeta(
+            @RequestBody(required = false) ContentFetchRequest request
+    ) {
+        ContentEmptyMetaResponse meta =
+                contentFeedService.buildEmptyMetaForCurrentUser(request);
+        return ResponseEntity.ok(meta);
     }
 
     // 🆓 GUEST users: random content, no DB user prefs / views

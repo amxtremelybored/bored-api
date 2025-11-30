@@ -1,10 +1,21 @@
 // src/main/java/in/bored/api/service/ContentFeedService.java
 package in.bored.api.service;
 
+import in.bored.api.dto.ContentCategorySummary;
+import in.bored.api.dto.ContentEmptyMetaResponse;
 import in.bored.api.dto.ContentFetchRequest;
 import in.bored.api.dto.ContentItemResponse;
 import in.bored.api.dto.GuestContentFetchRequest;
-import in.bored.api.model.*;
+import in.bored.api.dto.TopicSummary;
+import in.bored.api.model.ContentCategory;
+import in.bored.api.model.ContentCategory;
+import in.bored.api.model.ContentCategory;
+import in.bored.api.model.ProfileStatus;
+import in.bored.api.model.Topic;
+import in.bored.api.model.TopicContent;
+import in.bored.api.model.UserContentView;
+import in.bored.api.model.UserPreference;
+import in.bored.api.model.UserProfile;
 import in.bored.api.repo.TopicContentRepository;
 import in.bored.api.repo.TopicRepository;
 import in.bored.api.repo.UserContentViewRepository;
@@ -41,7 +52,7 @@ public class ContentFeedService {
     }
 
     // ---------------------------------------------------------
-    // 1) EXISTING: logged-in user feed (unseen, user prefs, views)
+    // 1) LOGGED-IN feed: unseen items based on prefs / topics
     // ---------------------------------------------------------
     public List<ContentItemResponse> fetchNextForCurrentUser(ContentFetchRequest request) {
         UserProfile profile = getCurrentUserProfile();
@@ -87,7 +98,7 @@ public class ContentFeedService {
     }
 
     // ---------------------------------------------------------
-    // 2) NEW: guest feed → random content, NO user, NO prefs, NO views
+    // 2) GUEST feed: random content, no prefs, no views
     // ---------------------------------------------------------
     public List<ContentItemResponse> fetchRandomForGuest(GuestContentFetchRequest request) {
         // Defensive defaults if request is null
@@ -122,7 +133,59 @@ public class ContentFeedService {
                 .toList();
     }
 
-    // ----------------- existing helpers below -----------------
+    // ---------------------------------------------------------
+    // 3) "Empty feed" meta for logged-in users (prefs + topics)
+    // ---------------------------------------------------------
+    public ContentEmptyMetaResponse buildEmptyMetaForCurrentUser(ContentFetchRequest request) {
+        UserProfile profile = getCurrentUserProfile();
+
+        List<Long> requestedTopicIds = (request != null) ? request.getTopicIds() : null;
+
+        // Try to reuse resolveTopics logic if topicIds are provided
+        List<Topic> requestedTopics = (requestedTopicIds != null && !requestedTopicIds.isEmpty())
+                ? resolveTopics(profile, requestedTopicIds)
+                : Collections.emptyList();
+
+        // Derive categories:
+        // 1) from user preferences
+        List<UserPreference> prefs = userPreferenceRepository.findByUserProfile(profile);
+        List<ContentCategory> prefCategories = prefs.stream()
+                .map(UserPreference::getCategory)
+                .distinct()
+                .toList();
+
+        // 2) if prefs are empty, fall back to categories from requested topics
+        if (prefCategories.isEmpty() && !requestedTopics.isEmpty()) {
+            prefCategories = requestedTopics.stream()
+                    .map(Topic::getCategory)
+                    .distinct()
+                    .toList();
+        }
+
+        // Load topics for those categories for suggestion
+        List<Topic> topicsForDisplay =
+                prefCategories.isEmpty()
+                        ? Collections.emptyList()
+                        : topicRepository.findByCategoryIn(prefCategories);
+
+        // Map to summaries
+        List<ContentCategorySummary> categorySummaries = prefCategories.stream()
+                .map(this::toCategorySummary)
+                .toList();
+
+        List<TopicSummary> topicSummaries = topicsForDisplay.stream()
+                .map(this::toTopicSummary)
+                .toList();
+
+        ContentEmptyMetaResponse response = new ContentEmptyMetaResponse();
+        response.setEmpty(true);
+        response.setPreferredCategories(categorySummaries);
+        response.setSuggestedTopics(topicSummaries);
+
+        return response;
+    }
+
+    // ----------------- existing helpers -----------------
 
     private List<Topic> resolveTopics(UserProfile profile, List<Long> topicIds) {
         // Case 1: explicit topicIds
@@ -161,6 +224,23 @@ public class ContentFeedService {
         dto.setContentIndex(c.getContentIndex());
         dto.setContent(c.getContent());
         dto.setCreatedAt(c.getCreatedAt());
+        return dto;
+    }
+
+    private ContentCategorySummary toCategorySummary(ContentCategory category) {
+        ContentCategorySummary dto = new ContentCategorySummary();
+        dto.setId(category.getId());      // UUID -> UUID
+        dto.setName(category.getName());
+        dto.setEmoji(category.getEmoji());
+        return dto;
+    }
+
+    private TopicSummary toTopicSummary(Topic topic) {
+        TopicSummary dto = new TopicSummary();
+        dto.setId(topic.getId());                         // Long -> Long
+        dto.setName(topic.getName());
+        dto.setEmoji(topic.getEmoji());
+        dto.setCategoryId(topic.getCategory().getId());   // UUID -> UUID
         return dto;
     }
 
