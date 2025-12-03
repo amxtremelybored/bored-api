@@ -238,11 +238,11 @@ public class ContentFeedService {
 
                     // If guestUid provided, save views for generated content too!
                     if (request != null && request.getGuestUid() != null && !request.getGuestUid().isEmpty()) {
-                        UserProfile guestProfile = getOrCreateGuestProfile(request.getGuestUid());
                         List<UserContentView> views = new java.util.ArrayList<>();
                         for (TopicContent tc : savedContents) {
                             UserContentView view = new UserContentView();
-                            view.setUserProfile(guestProfile);
+                            view.setGuestUid(request.getGuestUid()); // Set guest UID directly
+                            view.setUserProfile(null); // No profile for guests
                             view.setTopicContent(tc);
                             view.setTopic(tc.getTopic());
                             views.add(view);
@@ -264,11 +264,11 @@ public class ContentFeedService {
             // If we have content from DB
             // If guestUid provided, save views!
             if (request != null && request.getGuestUid() != null && !request.getGuestUid().isEmpty()) {
-                UserProfile guestProfile = getOrCreateGuestProfile(request.getGuestUid());
                 List<UserContentView> views = new java.util.ArrayList<>();
                 for (TopicContent tc : contents) {
                     UserContentView view = new UserContentView();
-                    view.setUserProfile(guestProfile);
+                    view.setGuestUid(request.getGuestUid()); // Set guest UID directly
+                    view.setUserProfile(null); // No profile for guests
                     view.setTopicContent(tc);
                     view.setTopic(tc.getTopic());
                     views.add(view);
@@ -471,13 +471,10 @@ public class ContentFeedService {
 
         // Filter from DB if guestUid provided
         if (guestUid != null && !guestUid.isEmpty()) {
-            UserProfile guestProfile = userProfileRepository.findByUid(guestUid).orElse(null);
-            if (guestProfile != null) {
-                Pageable pageable = PageRequest.of(0, 20);
-                List<Long> dbSeenIds = userContentViewRepository.findRecentTopicIds(guestProfile, pageable);
-                if (!dbSeenIds.isEmpty()) {
-                    candidates.removeIf(t -> dbSeenIds.contains(t.getId()));
-                }
+            Pageable pageable = PageRequest.of(0, 20);
+            List<Long> dbSeenIds = userContentViewRepository.findRecentTopicIdsForGuest(guestUid, pageable);
+            if (!dbSeenIds.isEmpty()) {
+                candidates.removeIf(t -> dbSeenIds.contains(t.getId()));
             }
         }
 
@@ -497,19 +494,6 @@ public class ContentFeedService {
         summary.setCategoryId(randomTopic.getCategory().getId());
 
         return summary;
-    }
-
-    private UserProfile getOrCreateGuestProfile(String guestUid) {
-        return userProfileRepository.findByUid(guestUid)
-                .orElseGet(() -> {
-                    UserProfile newGuest = new UserProfile();
-                    newGuest.setUid(guestUid);
-                    newGuest.setFirebaseUid(guestUid); // Assuming same for anon
-                    newGuest.setDisplayName("Guest");
-                    newGuest.setStatus(in.bored.api.model.ProfileStatus.ACTIVE); // or GUEST if enum exists
-                    // Set other required fields if any
-                    return userProfileRepository.save(newGuest);
-                });
     }
 
     private ContentCategorySummary toCategorySummary(ContentCategory category) {

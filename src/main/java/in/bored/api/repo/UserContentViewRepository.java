@@ -14,4 +14,7 @@ public interface UserContentViewRepository extends JpaRepository<UserContentView
 
     @Query("SELECT v.topic.id FROM UserContentView v WHERE v.userProfile = :profile ORDER BY v.viewedAt DESC")
     List<Long> findRecentTopicIds(@Param("profile") UserProfile profile, Pageable pageable);
+
+    @Query("SELECT v.topic.id FROM UserContentView v WHERE v.guestUid = :guestUid ORDER BY v.viewedAt DESC")
+    List<Long> findRecentTopicIdsForGuest(@Param("guestUid") String guestUid, Pageable pageable);
 }

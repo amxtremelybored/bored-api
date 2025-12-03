@@ -6,20 +6,22 @@ import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(
-        name = "user_content_views",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"user_profile_id", "topic_content_id"})
-)
+@Table(name = "user_content_views", uniqueConstraints = @UniqueConstraint(columnNames = { "user_profile_id",
+        "topic_content_id" }))
 public class UserContentView {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // user
+    // user (nullable for guests)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_profile_id", nullable = false)
+    @JoinColumn(name = "user_profile_id", nullable = true)
     private UserProfile userProfile;
+
+    // guest uid (nullable for logged-in users)
+    @Column(name = "guest_uid")
+    private String guestUid;
 
     // content
     @ManyToOne(fetch = FetchType.LAZY)
@@ -40,18 +42,51 @@ public class UserContentView {
     }
 
     // getters/setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Long getId() {
+        return id;
+    }
 
-    public UserProfile getUserProfile() { return userProfile; }
-    public void setUserProfile(UserProfile userProfile) { this.userProfile = userProfile; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public TopicContent getTopicContent() { return topicContent; }
-    public void setTopicContent(TopicContent topicContent) { this.topicContent = topicContent; }
+    public UserProfile getUserProfile() {
+        return userProfile;
+    }
 
-    public Topic getTopic() { return topic; }
-    public void setTopic(Topic topic) { this.topic = topic; }
+    public void setUserProfile(UserProfile userProfile) {
+        this.userProfile = userProfile;
+    }
 
-    public OffsetDateTime getViewedAt() { return viewedAt; }
-    public void setViewedAt(OffsetDateTime viewedAt) { this.viewedAt = viewedAt; }
+    public String getGuestUid() {
+        return guestUid;
+    }
+
+    public void setGuestUid(String guestUid) {
+        this.guestUid = guestUid;
+    }
+
+    public TopicContent getTopicContent() {
+        return topicContent;
+    }
+
+    public void setTopicContent(TopicContent topicContent) {
+        this.topicContent = topicContent;
+    }
+
+    public Topic getTopic() {
+        return topic;
+    }
+
+    public void setTopic(Topic topic) {
+        this.topic = topic;
+    }
+
+    public OffsetDateTime getViewedAt() {
+        return viewedAt;
+    }
+
+    public void setViewedAt(OffsetDateTime viewedAt) {
+        this.viewedAt = viewedAt;
+    }
 }
