@@ -12,26 +12,79 @@ public class ContentItemResponse {
     private Integer contentIndex;
     private String content;
     private OffsetDateTime createdAt;
+    private String source;
+    private String categoryName;
 
     // getters/setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Long getId() {
+        return id;
+    }
 
-    public Long getTopicId() { return topicId; }
-    public void setTopicId(Long topicId) { this.topicId = topicId; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public String getTopicName() { return topicName; }
-    public void setTopicName(String topicName) { this.topicName = topicName; }
+    public Long getTopicId() {
+        return topicId;
+    }
 
-    public String getTopicEmoji() { return topicEmoji; }
-    public void setTopicEmoji(String topicEmoji) { this.topicEmoji = topicEmoji; }
+    public void setTopicId(Long topicId) {
+        this.topicId = topicId;
+    }
 
-    public Integer getContentIndex() { return contentIndex; }
-    public void setContentIndex(Integer contentIndex) { this.contentIndex = contentIndex; }
+    public String getTopicName() {
+        return topicName;
+    }
 
-    public String getContent() { return content; }
-    public void setContent(String content) { this.content = content; }
+    public void setTopicName(String topicName) {
+        this.topicName = topicName;
+    }
 
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+    public String getTopicEmoji() {
+        return topicEmoji;
+    }
+
+    public void setTopicEmoji(String topicEmoji) {
+        this.topicEmoji = topicEmoji;
+    }
+
+    public Integer getContentIndex() {
+        return contentIndex;
+    }
+
+    public void setContentIndex(Integer contentIndex) {
+        this.contentIndex = contentIndex;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(OffsetDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
+    }
+
+    public String getCategoryName() {
+        return categoryName;
+    }
+
+    public void setCategoryName(String categoryName) {
+        this.categoryName = categoryName;
+    }
 }

@@ -38,17 +38,20 @@ public class ContentFeedService {
     private final UserProfileRepository userProfileRepository;
     private final UserPreferenceRepository userPreferenceRepository;
     private final UserContentViewRepository userContentViewRepository;
+    private final GeminiService geminiService;
 
     public ContentFeedService(TopicContentRepository topicContentRepository,
-                              TopicRepository topicRepository,
-                              UserProfileRepository userProfileRepository,
-                              UserPreferenceRepository userPreferenceRepository,
-                              UserContentViewRepository userContentViewRepository) {
+            TopicRepository topicRepository,
+            UserProfileRepository userProfileRepository,
+            UserPreferenceRepository userPreferenceRepository,
+            UserContentViewRepository userContentViewRepository,
+            GeminiService geminiService) {
         this.topicContentRepository = topicContentRepository;
         this.topicRepository = topicRepository;
         this.userProfileRepository = userProfileRepository;
         this.userPreferenceRepository = userPreferenceRepository;
         this.userContentViewRepository = userContentViewRepository;
+        this.geminiService = geminiService;
     }
 
     // ---------------------------------------------------------
@@ -71,10 +74,62 @@ public class ContentFeedService {
         Pageable pageable = PageRequest.of(0, size);
 
         // 3) Unseen content
-        List<TopicContent> contents =
-                topicContentRepository.findNextUnseenForUser(profile, topics, pageable);
+        List<TopicContent> contents = topicContentRepository.findNextUnseenForUser(profile, topics, pageable);
 
         if (contents.isEmpty()) {
+            // Fallback to Gemini if we have topics but no DB content
+            if (!topics.isEmpty()) {
+                // Pick a random topic from the resolved list
+                Topic fallbackTopic = topics.get(new java.util.Random().nextInt(topics.size()));
+
+                List<ContentItemResponse> generatedItems = geminiService.generateContent(
+                        fallbackTopic.getName(),
+                        fallbackTopic.getCategory().getName(),
+                        size);
+
+                if (generatedItems.isEmpty()) {
+                    return Collections.emptyList();
+                }
+
+                // Calculate next content index
+                Integer maxIndex = topicContentRepository.findMaxContentIndexByTopic(fallbackTopic);
+                int nextIndex = (maxIndex == null) ? 0 : maxIndex + 1;
+
+                // Persist new content
+                List<TopicContent> newContents = new java.util.ArrayList<>();
+                for (ContentItemResponse item : generatedItems) {
+                    TopicContent tc = new TopicContent();
+                    tc.setTopic(fallbackTopic);
+                    tc.setContent(item.getContent());
+                    tc.setContentIndex(nextIndex++);
+                    // prePersist will set createdAt
+                    newContents.add(tc);
+                }
+
+                List<TopicContent> savedContents = topicContentRepository.saveAll(newContents);
+
+                // Mark as viewed immediately
+                List<UserContentView> newViews = savedContents.stream()
+                        .map(c -> {
+                            UserContentView v = new UserContentView();
+                            v.setUserProfile(profile);
+                            v.setTopicContent(c);
+                            v.setTopic(c.getTopic());
+                            return v;
+                        })
+                        .toList();
+
+                userContentViewRepository.saveAll(newViews);
+
+                // Return mapped response
+                return savedContents.stream()
+                        .map(c -> {
+                            ContentItemResponse dto = this.toResponse(c);
+                            dto.setSource("Gemini");
+                            return dto;
+                        })
+                        .toList();
+            }
             return Collections.emptyList();
         }
 
@@ -163,10 +218,9 @@ public class ContentFeedService {
         }
 
         // Load topics for those categories for suggestion
-        List<Topic> topicsForDisplay =
-                prefCategories.isEmpty()
-                        ? Collections.emptyList()
-                        : topicRepository.findByCategoryIn(prefCategories);
+        List<Topic> topicsForDisplay = prefCategories.isEmpty()
+                ? Collections.emptyList()
+                : topicRepository.findByCategoryIn(prefCategories);
 
         // Map to summaries
         List<ContentCategorySummary> categorySummaries = prefCategories.stream()
@@ -224,12 +278,14 @@ public class ContentFeedService {
         dto.setContentIndex(c.getContentIndex());
         dto.setContent(c.getContent());
         dto.setCreatedAt(c.getCreatedAt());
+        dto.setSource("API");
+        dto.setCategoryName(c.getTopic().getCategory().getName());
         return dto;
     }
 
     private ContentCategorySummary toCategorySummary(ContentCategory category) {
         ContentCategorySummary dto = new ContentCategorySummary();
-        dto.setId(category.getId());      // UUID -> UUID
+        dto.setId(category.getId()); // UUID -> UUID
         dto.setName(category.getName());
         dto.setEmoji(category.getEmoji());
         return dto;
@@ -237,18 +293,17 @@ public class ContentFeedService {
 
     private TopicSummary toTopicSummary(Topic topic) {
         TopicSummary dto = new TopicSummary();
-        dto.setId(topic.getId());                         // Long -> Long
+        dto.setId(topic.getId()); // Long -> Long
         dto.setName(topic.getName());
         dto.setEmoji(topic.getEmoji());
-        dto.setCategoryId(topic.getCategory().getId());   // UUID -> UUID
+        dto.setCategoryId(topic.getCategory().getId()); // UUID -> UUID
         return dto;
     }
 
     private UserProfile getCurrentUserProfile() {
         String uid = getCurrentUid();
         return userProfileRepository.findByUidAndStatusNot(uid, ProfileStatus.DELETED)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("UserProfile not found or deleted for uid: " + uid));
+                .orElseThrow(() -> new ResourceNotFoundException("UserProfile not found or deleted for uid: " + uid));
     }
 
     private String getCurrentUid() {
