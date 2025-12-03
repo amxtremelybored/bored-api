@@ -36,7 +36,12 @@ public class SecurityConfig {
                         .permitAll()
 
                         // 🆓 GUEST endpoint → no auth required
-                        .requestMatchers("/api/content/guest-next").permitAll()
+                        // 🆓 GUEST endpoints → no auth required (or optional auth)
+                        .requestMatchers(
+                                "/api/content/guest-next",
+                                "/api/content/guest-topic-next",
+                                "/api/content/next" // Unified endpoint (smart handling)
+                        ).permitAll()
 
                         // everything else requires Firebase auth
                         .anyRequest().authenticated())
