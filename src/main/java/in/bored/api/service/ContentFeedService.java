@@ -24,6 +24,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
@@ -31,6 +33,8 @@ import java.util.List;
 
 @Service
 public class ContentFeedService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ContentFeedService.class);
 
     private final TopicContentRepository topicContentRepository;
     private final TopicRepository topicRepository;
@@ -112,10 +116,14 @@ public class ContentFeedService {
             if (!topics.isEmpty()) {
                 // Pick a random topic from the resolved list
                 Topic fallbackTopic = topics.get(new java.util.Random().nextInt(topics.size()));
+                logger.info("⚠️ No DB content for user. Falling back to Gemini for topic: {}", fallbackTopic.getName());
+
+                String catName = (fallbackTopic.getCategory() != null) ? fallbackTopic.getCategory().getName()
+                        : "General";
 
                 List<ContentItemResponse> generatedItems = geminiService.generateContent(
                         fallbackTopic.getName(),
-                        fallbackTopic.getCategory().getName(),
+                        catName,
                         size);
 
                 if (generatedItems.isEmpty()) {
@@ -218,9 +226,13 @@ public class ContentFeedService {
 
             // If DB empty for this topic, try Gemini fallback
             if (contents.isEmpty()) {
+                logger.info("⚠️ No DB content for guest (random). Falling back to Gemini for topic: {}",
+                        randomTopic.getName());
+                String catName = (randomTopic.getCategory() != null) ? randomTopic.getCategory().getName() : "General";
+
                 List<ContentItemResponse> generatedItems = geminiService.generateContent(
                         randomTopic.getName(),
-                        randomTopic.getCategory().getName(),
+                        catName,
                         size);
 
                 if (!generatedItems.isEmpty()) {
@@ -315,9 +327,13 @@ public class ContentFeedService {
         // Fallback: If no content in DB, try Gemini (only if single topic requested)
         if ((contents == null || contents.isEmpty()) && topics.size() == 1) {
             Topic targetTopic = topics.get(0);
+            logger.info("⚠️ No DB content for guest (sticky). Falling back to Gemini for topic: {}",
+                    targetTopic.getName());
+            String catName = (targetTopic.getCategory() != null) ? targetTopic.getCategory().getName() : "General";
+
             List<ContentItemResponse> generatedItems = geminiService.generateContent(
                     targetTopic.getName(),
-                    targetTopic.getCategory().getName(),
+                    catName,
                     size);
 
             if (!generatedItems.isEmpty()) {
