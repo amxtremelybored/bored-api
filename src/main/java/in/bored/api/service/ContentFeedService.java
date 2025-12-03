@@ -93,8 +93,17 @@ public class ContentFeedService {
             topics = List.of(randomTopic);
 
         } else {
-            // Normal flow: stick to requested topics or resolve from prefs
-            topics = resolveTopics(profile, request.getTopicIds());
+            // Normal flow: STRICTLY stick to requested topics.
+            // "topicIds is must all logic shpuld be based on that"
+            if (request.getTopicIds() == null || request.getTopicIds().isEmpty()) {
+                logger.warn(
+                        "⚠️ fetchNextForCurrentUser: topicIds missing in request. Returning empty list (no fallback to prefs).");
+                return Collections.emptyList();
+            }
+            topics = topicRepository.findAllById(request.getTopicIds());
+            if (topics.size() != request.getTopicIds().size()) {
+                logger.warn("⚠️ fetchNextForCurrentUser: Some requested topicIds not found.");
+            }
         }
 
         if (topics.isEmpty()) {
