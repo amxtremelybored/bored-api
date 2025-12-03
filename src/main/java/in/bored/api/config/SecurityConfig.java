@@ -32,16 +32,16 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/error"
-                        ).permitAll()
+                                "/error")
+                        .permitAll()
 
                         // 🆓 GUEST endpoint → no auth required
                         .requestMatchers("/api/content/guest-next").permitAll()
 
                         // everything else requires Firebase auth
-                        .anyRequest().authenticated()
-                )
-                // ✅ Authenticate Firebase token before Spring's UsernamePasswordAuthenticationFilter
+                        .anyRequest().authenticated())
+                // ✅ Authenticate Firebase token before Spring's
+                // UsernamePasswordAuthenticationFilter
                 .addFilterBefore(firebaseAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

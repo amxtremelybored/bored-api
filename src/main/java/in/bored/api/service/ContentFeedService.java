@@ -307,11 +307,84 @@ public class ContentFeedService {
 
         List<TopicContent> contents = topicContentRepository.findRandomByTopicIn(topics, pageable);
 
+        // Fallback: If no content in DB, try Gemini (only if single topic requested)
+        if ((contents == null || contents.isEmpty()) && topics.size() == 1) {
+            Topic targetTopic = topics.get(0);
+            List<ContentItemResponse> generatedItems = geminiService.generateContent(
+                    targetTopic.getName(),
+                    targetTopic.getCategory().getName(),
+                    size);
+
+            if (!generatedItems.isEmpty()) {
+                Integer maxIndex = topicContentRepository.findMaxContentIndexByTopic(targetTopic);
+                int nextIndex = (maxIndex == null) ? 0 : maxIndex + 1;
+
+                List<TopicContent> newContents = new java.util.ArrayList<>();
+                for (ContentItemResponse item : generatedItems) {
+                    TopicContent tc = new TopicContent();
+                    tc.setTopic(targetTopic);
+                    tc.setContent(item.getContent());
+                    tc.setContentIndex(nextIndex++);
+                    tc.setCreatedAt(java.time.OffsetDateTime.now());
+                    newContents.add(tc);
+                }
+                List<TopicContent> savedContents = topicContentRepository.saveAll(newContents);
+
+                // Update flags
+                java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
+                targetTopic.setContentLoaded(true);
+                targetTopic.setContentLoadedAt(now);
+                topicRepository.save(targetTopic);
+
+                ContentCategory category = targetTopic.getCategory();
+                if (category != null) {
+                    category.setContentLoaded(true);
+                    category.setContentLoadedAt(now);
+                    contentCategoryRepository.save(category);
+                }
+
+                // Save history if guestUid present
+                if (request != null && request.getGuestUid() != null && !request.getGuestUid().isEmpty()) {
+                    List<UserContentView> views = new java.util.ArrayList<>();
+                    for (TopicContent tc : savedContents) {
+                        UserContentView view = new UserContentView();
+                        view.setGuestUid(request.getGuestUid());
+                        view.setUserProfile(null);
+                        view.setTopicContent(tc);
+                        view.setTopic(tc.getTopic());
+                        views.add(view);
+                    }
+                    userContentViewRepository.saveAll(views);
+                }
+
+                return savedContents.stream()
+                        .map(tc -> {
+                            ContentItemResponse resp = toResponse(tc);
+                            resp.setSource("Gemini");
+                            return resp;
+                        })
+                        .toList();
+            }
+        }
+
         if (contents == null || contents.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // IMPORTANT: we DO NOT store UserContentView here → totally stateless
+        // Save history if guestUid present
+        if (request != null && request.getGuestUid() != null && !request.getGuestUid().isEmpty()) {
+            List<UserContentView> views = new java.util.ArrayList<>();
+            for (TopicContent tc : contents) {
+                UserContentView view = new UserContentView();
+                view.setGuestUid(request.getGuestUid());
+                view.setUserProfile(null);
+                view.setTopicContent(tc);
+                view.setTopic(tc.getTopic());
+                views.add(view);
+            }
+            userContentViewRepository.saveAll(views);
+        }
+
         return contents.stream()
                 .map(this::toResponse)
                 .toList();

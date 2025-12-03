@@ -25,7 +25,36 @@ public class ContentFeedController {
         // 🔐 Authenticated users: unseen feed based on prefs
         @PostMapping("/next")
         public ResponseEntity<List<ContentItemResponse>> getNextContent(
-                        @RequestBody ContentFetchRequest request) {
+                        @RequestBody(required = false) ContentFetchRequest request) {
+
+                // Check if user is authenticated
+                org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder
+                                .getContext().getAuthentication();
+
+                boolean isGuest = auth == null || !auth.isAuthenticated()
+                                || "anonymousUser".equals(auth.getPrincipal());
+
+                if (isGuest) {
+                        // Delegate to guest logic
+                        GuestContentFetchRequest guestRequest = new GuestContentFetchRequest();
+                        if (request != null) {
+                                guestRequest.setTopicIds(request.getTopicIds());
+                                guestRequest.setSize(request.getSize());
+                                guestRequest.setRefreshContent(request.getRefreshTopic());
+                        }
+
+                        // Extract guest UID from header if present (Firebase anon auth)
+                        if (auth != null && "anonymousUser".equals(auth.getPrincipal()) == false) {
+                                // If principal is a String UID (from Firebase filter)
+                                if (auth.getPrincipal() instanceof String) {
+                                        guestRequest.setGuestUid((String) auth.getPrincipal());
+                                }
+                        }
+
+                        return ResponseEntity.ok(contentFeedService.fetchRandomForGuest(guestRequest));
+                }
+
+                // Authenticated user logic
                 List<ContentItemResponse> items = contentFeedService.fetchNextForCurrentUser(request);
                 return ResponseEntity.ok(items);
         }
