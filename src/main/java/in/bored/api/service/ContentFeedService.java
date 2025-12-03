@@ -305,7 +305,12 @@ public class ContentFeedService {
             return Collections.emptyList();
         }
 
-        List<TopicContent> contents = topicContentRepository.findRandomByTopicIn(topics, pageable);
+        List<TopicContent> contents;
+        if (request != null && request.getGuestUid() != null && !request.getGuestUid().isEmpty()) {
+            contents = topicContentRepository.findRandomUnseenForGuest(topics, request.getGuestUid(), pageable);
+        } else {
+            contents = topicContentRepository.findRandomByTopicIn(topics, pageable);
+        }
 
         // Fallback: If no content in DB, try Gemini (only if single topic requested)
         if ((contents == null || contents.isEmpty()) && topics.size() == 1) {

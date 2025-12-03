@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import in.bored.api.dto.ContentItemResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -18,6 +20,8 @@ import java.util.List;
 
 @Service
 public class GeminiService {
+
+    private static final Logger logger = LoggerFactory.getLogger(GeminiService.class);
 
     private static final String GEMINI_API_KEY = "AIzaSyC6whpZnxGoQS7JFkpKSUvb8hxTWj_3anc";
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
@@ -37,6 +41,9 @@ public class GeminiService {
             String prompt = buildPrompt(topicName, categoryName, count);
             String requestBody = buildRequestBody(prompt);
 
+            logger.info("🤖 Calling Gemini API for topic: '{}', category: '{}', count: {}", topicName, categoryName,
+                    count);
+
             String url = String.format("%s/models/%s:generateContent?key=%s", GEMINI_BASE_URL, MODEL, GEMINI_API_KEY);
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -48,14 +55,15 @@ public class GeminiService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == 200) {
+                logger.info("✅ Gemini API response received successfully for topic: '{}'", topicName);
                 return parseGeminiResponse(response.body(), topicName);
             } else {
-                System.err.println("Gemini API Error: " + response.statusCode() + " " + response.body());
+                logger.error("❌ Gemini API Error: {} {}", response.statusCode(), response.body());
                 return Collections.emptyList();
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("❌ Exception while calling Gemini API", e);
             return Collections.emptyList();
         }
     }
@@ -128,7 +136,7 @@ public class GeminiService {
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error parsing Gemini response: " + e.getMessage());
+            logger.error("❌ Error parsing Gemini response", e);
         }
         return results;
     }
