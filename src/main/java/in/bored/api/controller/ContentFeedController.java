@@ -61,8 +61,14 @@ public class ContentFeedController {
 
         @PostMapping("/topic-next")
         public ResponseEntity<TopicSummary> getNextTopic(
-                        @RequestBody(required = false) java.util.Map<String, Long> payload) {
-                Long currentTopicId = (payload != null) ? payload.get("currentTopicId") : null;
+                        @RequestBody(required = false) java.util.Map<String, Object> payload) {
+                Long currentTopicId = null;
+                if (payload != null && payload.containsKey("currentTopicId")) {
+                        Object val = payload.get("currentTopicId");
+                        if (val instanceof Number) {
+                                currentTopicId = ((Number) val).longValue();
+                        }
+                }
                 TopicSummary summary = contentFeedService.getNextTopicForUser(currentTopicId);
                 return ResponseEntity.ok(summary);
         }
