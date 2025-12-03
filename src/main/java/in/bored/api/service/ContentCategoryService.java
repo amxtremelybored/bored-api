@@ -24,7 +24,7 @@ public class ContentCategoryService {
 
     @Transactional(readOnly = true)
     public List<ContentCategoryResponse> getAll() {
-        return repository.findAll()
+        return repository.findAllByContentLoadedTrue()
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -34,16 +34,14 @@ public class ContentCategoryService {
     public ContentCategoryResponse getById(UUID id) {
         ContentCategory entity = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "ContentCategory not found for id: " + id
-                ));
+                        "ContentCategory not found for id: " + id));
         return toResponse(entity);
     }
 
     public ContentCategoryResponse create(ContentCategoryRequest request) {
         if (repository.existsByNameIgnoreCase(request.getName())) {
             throw new IllegalArgumentException(
-                    "ContentCategory with name '" + request.getName() + "' already exists"
-            );
+                    "ContentCategory with name '" + request.getName() + "' already exists");
         }
 
         ContentCategory entity = new ContentCategory();
@@ -56,15 +54,13 @@ public class ContentCategoryService {
     public ContentCategoryResponse update(UUID id, ContentCategoryRequest request) {
         ContentCategory entity = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "ContentCategory not found for id: " + id
-                ));
+                        "ContentCategory not found for id: " + id));
 
         repository.findByNameIgnoreCase(request.getName())
                 .filter(other -> !other.getId().equals(id))
                 .ifPresent(other -> {
                     throw new IllegalArgumentException(
-                            "Another ContentCategory with name '" + request.getName() + "' already exists"
-                    );
+                            "Another ContentCategory with name '" + request.getName() + "' already exists");
                 });
 
         applyRequestToEntity(request, entity, false);
@@ -81,8 +77,8 @@ public class ContentCategoryService {
     }
 
     private void applyRequestToEntity(ContentCategoryRequest request,
-                                      ContentCategory entity,
-                                      boolean isCreate) {
+            ContentCategory entity,
+            boolean isCreate) {
 
         entity.setName(request.getName().trim());
         entity.setEmoji(request.getEmoji());
@@ -106,7 +102,6 @@ public class ContentCategoryService {
                 entity.isContentLoaded(),
                 entity.getContentLoadedAt(),
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
-        );
+                entity.getUpdatedAt());
     }
 }

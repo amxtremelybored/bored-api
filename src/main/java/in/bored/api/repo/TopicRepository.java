@@ -10,11 +10,13 @@ import java.util.List;
 
 public interface TopicRepository extends JpaRepository<Topic, Long> {
 
-    List<Topic> findByCategoryIn(List<ContentCategory> categories);
+    List<Topic> findByCategoryInAndContentLoadedTrue(List<ContentCategory> categories);
 
-    @Query(value = "SELECT * FROM topics ORDER BY RANDOM() LIMIT 1", nativeQuery = true)
+    List<Topic> findAllByContentLoadedTrue();
+
+    @Query(value = "SELECT * FROM topics WHERE is_content_loaded = true ORDER BY RANDOM() LIMIT 1", nativeQuery = true)
     Topic findRandomTopic();
 
-    @Query(value = "SELECT t.* FROM topics t JOIN topic_contents tc ON t.id = tc.topic_id ORDER BY RANDOM() LIMIT 1", nativeQuery = true)
+    @Query(value = "SELECT t.* FROM topics t JOIN topic_contents tc ON t.id = tc.topic_id WHERE t.is_content_loaded = true ORDER BY RANDOM() LIMIT 1", nativeQuery = true)
     Topic findRandomTopicWithContent();
 }

@@ -9,5 +9,8 @@ import java.util.UUID;
 
 public interface ContentCategoryRepository extends JpaRepository<ContentCategory, UUID> {
     boolean existsByNameIgnoreCase(String name);
+
     Optional<ContentCategory> findByNameIgnoreCase(String name);
+
+    java.util.List<ContentCategory> findAllByContentLoadedTrue();
 }

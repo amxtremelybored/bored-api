@@ -14,6 +14,7 @@ import in.bored.api.model.TopicContent;
 import in.bored.api.model.UserContentView;
 import in.bored.api.model.UserPreference;
 import in.bored.api.model.UserProfile;
+import in.bored.api.repo.ContentCategoryRepository;
 import in.bored.api.repo.TopicContentRepository;
 import in.bored.api.repo.TopicRepository;
 import in.bored.api.repo.UserContentViewRepository;
@@ -36,6 +37,7 @@ public class ContentFeedService {
     private final UserProfileRepository userProfileRepository;
     private final UserPreferenceRepository userPreferenceRepository;
     private final UserContentViewRepository userContentViewRepository;
+    private final ContentCategoryRepository contentCategoryRepository;
     private final GeminiService geminiService;
 
     public ContentFeedService(TopicContentRepository topicContentRepository,
@@ -43,12 +45,14 @@ public class ContentFeedService {
             UserProfileRepository userProfileRepository,
             UserPreferenceRepository userPreferenceRepository,
             UserContentViewRepository userContentViewRepository,
+            ContentCategoryRepository contentCategoryRepository,
             GeminiService geminiService) {
         this.topicContentRepository = topicContentRepository;
         this.topicRepository = topicRepository;
         this.userProfileRepository = userProfileRepository;
         this.userPreferenceRepository = userPreferenceRepository;
         this.userContentViewRepository = userContentViewRepository;
+        this.contentCategoryRepository = contentCategoryRepository;
         this.geminiService = geminiService;
     }
 
@@ -75,7 +79,7 @@ public class ContentFeedService {
             }
 
             // 2. Get all topics for these categories
-            List<Topic> allTopics = topicRepository.findByCategoryIn(categories);
+            List<Topic> allTopics = topicRepository.findByCategoryInAndContentLoadedTrue(categories);
             if (allTopics.isEmpty()) {
                 return Collections.emptyList();
             }
@@ -236,6 +240,20 @@ public class ContentFeedService {
                     }
                     List<TopicContent> savedContents = topicContentRepository.saveAll(newContents);
 
+                    // Update flags for Topic and Category
+                    java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
+
+                    randomTopic.setContentLoaded(true);
+                    randomTopic.setContentLoadedAt(now);
+                    topicRepository.save(randomTopic);
+
+                    ContentCategory category = randomTopic.getCategory();
+                    if (category != null) {
+                        category.setContentLoaded(true);
+                        category.setContentLoadedAt(now);
+                        contentCategoryRepository.save(category);
+                    }
+
                     // If guestUid provided, save views for generated content too!
                     if (request != null && request.getGuestUid() != null && !request.getGuestUid().isEmpty()) {
                         List<UserContentView> views = new java.util.ArrayList<>();
@@ -331,7 +349,7 @@ public class ContentFeedService {
         // Load topics for those categories for suggestion
         List<Topic> topicsForDisplay = prefCategories.isEmpty()
                 ? Collections.emptyList()
-                : topicRepository.findByCategoryIn(prefCategories);
+                : topicRepository.findByCategoryInAndContentLoadedTrue(prefCategories);
 
         // Map to summaries
         List<ContentCategorySummary> categorySummaries = prefCategories.stream()
@@ -377,7 +395,7 @@ public class ContentFeedService {
             return Collections.emptyList();
         }
 
-        return topicRepository.findByCategoryIn(categories);
+        return topicRepository.findByCategoryInAndContentLoadedTrue(categories);
     }
 
     private ContentItemResponse toResponse(TopicContent c) {
@@ -409,7 +427,7 @@ public class ContentFeedService {
         }
 
         // 2. Get all topics for these categories
-        List<Topic> allTopics = topicRepository.findByCategoryIn(categories);
+        List<Topic> allTopics = topicRepository.findByCategoryInAndContentLoadedTrue(categories);
         if (allTopics.isEmpty()) {
             throw new ResourceNotFoundException("No topics found for preferences");
         }
@@ -455,7 +473,7 @@ public class ContentFeedService {
 
     public TopicSummary getNextTopicForGuest(String guestUid, List<Long> seenTopicIds) {
         // 1. Fetch all topics (or a large random subset)
-        List<Topic> allTopics = topicRepository.findAll();
+        List<Topic> allTopics = topicRepository.findAllByContentLoadedTrue();
 
         if (allTopics.isEmpty()) {
             throw new ResourceNotFoundException("No topics found");
