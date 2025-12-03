@@ -5,6 +5,7 @@ import in.bored.api.dto.ContentEmptyMetaResponse;
 import in.bored.api.dto.ContentFetchRequest;
 import in.bored.api.dto.ContentItemResponse;
 import in.bored.api.dto.GuestContentFetchRequest;
+import in.bored.api.dto.TopicSummary;
 import in.bored.api.service.ContentFeedService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,40 +16,88 @@ import java.util.List;
 @RequestMapping("/api/content")
 public class ContentFeedController {
 
-    private final ContentFeedService contentFeedService;
+        private final ContentFeedService contentFeedService;
 
-    public ContentFeedController(ContentFeedService contentFeedService) {
-        this.contentFeedService = contentFeedService;
-    }
+        public ContentFeedController(ContentFeedService contentFeedService) {
+                this.contentFeedService = contentFeedService;
+        }
 
-    // 🔐 Authenticated users: unseen feed based on prefs
-    @PostMapping("/next")
-    public ResponseEntity<List<ContentItemResponse>> getNextContent(
-            @RequestBody ContentFetchRequest request
-    ) {
-        List<ContentItemResponse> items =
-                contentFeedService.fetchNextForCurrentUser(request);
-        return ResponseEntity.ok(items);
-    }
+        // 🔐 Authenticated users: unseen feed based on prefs
+        @PostMapping("/next")
+        public ResponseEntity<List<ContentItemResponse>> getNextContent(
+                        @RequestBody ContentFetchRequest request) {
+                List<ContentItemResponse> items = contentFeedService.fetchNextForCurrentUser(request);
+                return ResponseEntity.ok(items);
+        }
 
-    // 🧠 When /next returns [], client can call this to get prefs + topics
-    @PostMapping("/next/meta")
-    public ResponseEntity<ContentEmptyMetaResponse> getNextContentMeta(
-            @RequestBody(required = false) ContentFetchRequest request
-    ) {
-        ContentEmptyMetaResponse meta =
-                contentFeedService.buildEmptyMetaForCurrentUser(request);
-        return ResponseEntity.ok(meta);
-    }
+        @PostMapping("/topic-next")
+        public ResponseEntity<TopicSummary> getNextTopic(
+                        @RequestBody(required = false) java.util.Map<String, Long> payload) {
+                Long currentTopicId = (payload != null) ? payload.get("currentTopicId") : null;
+                TopicSummary summary = contentFeedService.getNextTopicForUser(currentTopicId);
+                return ResponseEntity.ok(summary);
+        }
 
-    // 🆓 GUEST users: random content, no DB user prefs / views
-    @PostMapping("/guest-next")
-    public ResponseEntity<List<ContentItemResponse>> getGuestContent(
-            @RequestBody(required = false) GuestContentFetchRequest request
-    ) {
-        // request can be null – handle gracefully in service
-        List<ContentItemResponse> items =
-                contentFeedService.fetchRandomForGuest(request);
-        return ResponseEntity.ok(items);
-    }
+        // 🧠 When /next returns [], client can call this to get prefs + topics
+        @PostMapping("/next/meta")
+        public ResponseEntity<ContentEmptyMetaResponse> getNextContentMeta(
+                        @RequestBody(required = false) ContentFetchRequest request) {
+                ContentEmptyMetaResponse meta = contentFeedService.buildEmptyMetaForCurrentUser(request);
+                return ResponseEntity.ok(meta);
+        }
+
+        // 🆓 GUEST users: random content, no DB user prefs / views
+        @PostMapping("/guest-next")
+        public ResponseEntity<List<ContentItemResponse>> getGuestContent(
+                        @RequestBody(required = false) GuestContentFetchRequest request) {
+
+                // Extract UID from header if present
+                org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder
+                                .getContext().getAuthentication();
+                String headerUid = null;
+                if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+                        headerUid = (String) auth.getPrincipal();
+                }
+
+                if (request == null) {
+                        request = new GuestContentFetchRequest();
+                }
+
+                // Header takes precedence, or fallback to body if header missing (though body
+                // field might be deprecated)
+                if (headerUid != null) {
+                        request.setGuestUid(headerUid);
+                }
+
+                List<ContentItemResponse> items = contentFeedService.fetchRandomForGuest(request);
+                return ResponseEntity.ok(items);
+        }
+
+        @PostMapping("/guest-topic-next")
+        public ResponseEntity<TopicSummary> getGuestNextTopic(
+                        @RequestBody(required = false) java.util.Map<String, Object> payload) {
+                // Extract UID from header if present
+                org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder
+                                .getContext().getAuthentication();
+                String headerUid = null;
+                if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+                        headerUid = (String) auth.getPrincipal();
+                }
+
+                String payloadUid = (payload != null) ? (String) payload.get("guestUid") : null;
+                String guestUid = (headerUid != null) ? headerUid : payloadUid;
+
+                // Backward compatibility: still accept seenTopicIds if provided (optional)
+                List<Long> seenTopicIds = null;
+                if (payload != null && payload.containsKey("seenTopicIds")) {
+                        try {
+                                seenTopicIds = (List<Long>) payload.get("seenTopicIds");
+                        } catch (Exception e) {
+                                // ignore if format is wrong
+                        }
+                }
+
+                TopicSummary summary = contentFeedService.getNextTopicForGuest(guestUid, seenTopicIds);
+                return ResponseEntity.ok(summary);
+        }
 }

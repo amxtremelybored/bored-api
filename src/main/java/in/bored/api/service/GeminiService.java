@@ -19,7 +19,7 @@ import java.util.List;
 @Service
 public class GeminiService {
 
-    private static final String GEMINI_API_KEY = "AIzaSyCRj5v0Y0-trJAneMqWCjG-2mTC1jxLf3g";
+    private static final String GEMINI_API_KEY = "AIzaSyC6whpZnxGoQS7JFkpKSUvb8hxTWj_3anc";
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
     // Using the specific preview model available to this key
     private static final String MODEL = "gemini-2.5-flash-lite-preview-09-2025";

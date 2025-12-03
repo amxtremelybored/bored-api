@@ -16,6 +16,16 @@ public class GuestContentFetchRequest {
      */
     private Integer size;
 
+    /**
+     * If true, ignore topicIds and pick a new random topic.
+     */
+    private Boolean refreshContent;
+
+    /**
+     * Optional: Firebase UID for guest users to track history.
+     */
+    private String guestUid;
+
     public List<Long> getTopicIds() {
         return topicIds;
     }
@@ -30,5 +40,21 @@ public class GuestContentFetchRequest {
 
     public void setSize(Integer size) {
         this.size = size;
+    }
+
+    public Boolean getRefreshContent() {
+        return refreshContent;
+    }
+
+    public void setRefreshContent(Boolean refreshContent) {
+        this.refreshContent = refreshContent;
+    }
+
+    public String getGuestUid() {
+        return guestUid;
+    }
+
+    public void setGuestUid(String guestUid) {
+        this.guestUid = guestUid;
     }
 }

@@ -8,8 +8,6 @@ import in.bored.api.dto.ContentItemResponse;
 import in.bored.api.dto.GuestContentFetchRequest;
 import in.bored.api.dto.TopicSummary;
 import in.bored.api.model.ContentCategory;
-import in.bored.api.model.ContentCategory;
-import in.bored.api.model.ContentCategory;
 import in.bored.api.model.ProfileStatus;
 import in.bored.api.model.Topic;
 import in.bored.api.model.TopicContent;
@@ -60,8 +58,37 @@ public class ContentFeedService {
     public List<ContentItemResponse> fetchNextForCurrentUser(ContentFetchRequest request) {
         UserProfile profile = getCurrentUserProfile();
 
-        // 1) Resolve topics
-        List<Topic> topics = resolveTopics(profile, request.getTopicIds());
+        boolean refreshTopic = (request != null && request.getRefreshTopic() != null && request.getRefreshTopic());
+
+        List<Topic> topics;
+        if (refreshTopic) {
+            // "I'm Bored" clicked -> Pick a NEW random topic from user's categories
+            // 1. Get user's preferred categories
+            List<UserPreference> prefs = userPreferenceRepository.findByUserProfile(profile);
+            List<ContentCategory> categories = prefs.stream()
+                    .map(UserPreference::getCategory)
+                    .distinct()
+                    .toList();
+
+            if (categories.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            // 2. Get all topics for these categories
+            List<Topic> allTopics = topicRepository.findByCategoryIn(categories);
+            if (allTopics.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            // 3. Pick one random topic
+            Topic randomTopic = allTopics.get(new java.util.Random().nextInt(allTopics.size()));
+            topics = List.of(randomTopic);
+
+        } else {
+            // Normal flow: stick to requested topics or resolve from prefs
+            topics = resolveTopics(profile, request.getTopicIds());
+        }
+
         if (topics.isEmpty()) {
             return Collections.emptyList();
         }
@@ -158,25 +185,109 @@ public class ContentFeedService {
     public List<ContentItemResponse> fetchRandomForGuest(GuestContentFetchRequest request) {
         // Defensive defaults if request is null
         List<Long> topicIds = (request != null) ? request.getTopicIds() : null;
+        boolean refresh = (request != null && request.getRefreshContent() != null && request.getRefreshContent());
+
         int size = (request != null && request.getSize() != null && request.getSize() > 0)
                 ? request.getSize()
                 : 5;
 
         Pageable pageable = PageRequest.of(0, size);
 
-        List<TopicContent> contents;
+        // 1. REFRESH or INITIAL LOAD (no topicIds): Pick ONE random topic
+        if (refresh || (topicIds == null || topicIds.isEmpty())) {
+            // First, try to find a topic that HAS content
+            Topic randomTopic = topicRepository.findRandomTopicWithContent();
 
-        // Case 1: restrict to specific topics (if provided)
-        if (topicIds != null && !topicIds.isEmpty()) {
-            List<Topic> topics = topicRepository.findAllById(topicIds);
-            if (topics.isEmpty()) {
+            // If DB is completely empty (no topics have content), pick ANY topic
+            if (randomTopic == null) {
+                randomTopic = topicRepository.findRandomTopic();
+            }
+
+            if (randomTopic == null) {
                 return Collections.emptyList();
             }
-            contents = topicContentRepository.findRandomByTopicIn(topics, pageable);
-        } else {
-            // Case 2: fully random across all topics
-            contents = topicContentRepository.findRandom(pageable);
+
+            // Fetch content for this specific topic
+            List<TopicContent> contents = topicContentRepository.findRandomByTopicIn(
+                    List.of(randomTopic),
+                    pageable);
+
+            // If DB empty for this topic, try Gemini fallback
+            if (contents.isEmpty()) {
+                List<ContentItemResponse> generatedItems = geminiService.generateContent(
+                        randomTopic.getName(),
+                        randomTopic.getCategory().getName(),
+                        size);
+
+                if (!generatedItems.isEmpty()) {
+                    // Calculate next content index
+                    Integer maxIndex = topicContentRepository.findMaxContentIndexByTopic(randomTopic);
+                    int nextIndex = (maxIndex == null) ? 0 : maxIndex + 1;
+
+                    // Persist new content
+                    List<TopicContent> newContents = new java.util.ArrayList<>();
+                    for (ContentItemResponse item : generatedItems) {
+                        TopicContent tc = new TopicContent();
+                        tc.setTopic(randomTopic);
+                        tc.setContent(item.getContent());
+                        tc.setContentIndex(nextIndex++);
+                        tc.setCreatedAt(java.time.OffsetDateTime.now());
+                        newContents.add(tc);
+                    }
+                    List<TopicContent> savedContents = topicContentRepository.saveAll(newContents);
+
+                    // If guestUid provided, save views for generated content too!
+                    if (request != null && request.getGuestUid() != null && !request.getGuestUid().isEmpty()) {
+                        UserProfile guestProfile = getOrCreateGuestProfile(request.getGuestUid());
+                        List<UserContentView> views = new java.util.ArrayList<>();
+                        for (TopicContent tc : savedContents) {
+                            UserContentView view = new UserContentView();
+                            view.setUserProfile(guestProfile);
+                            view.setTopicContent(tc);
+                            view.setTopic(tc.getTopic());
+                            views.add(view);
+                        }
+                        userContentViewRepository.saveAll(views);
+                    }
+
+                    return savedContents.stream()
+                            .map(tc -> {
+                                ContentItemResponse resp = toResponse(tc);
+                                resp.setSource("Gemini");
+                                return resp;
+                            })
+                            .toList();
+                }
+                return Collections.emptyList();
+            }
+
+            // If we have content from DB
+            // If guestUid provided, save views!
+            if (request != null && request.getGuestUid() != null && !request.getGuestUid().isEmpty()) {
+                UserProfile guestProfile = getOrCreateGuestProfile(request.getGuestUid());
+                List<UserContentView> views = new java.util.ArrayList<>();
+                for (TopicContent tc : contents) {
+                    UserContentView view = new UserContentView();
+                    view.setUserProfile(guestProfile);
+                    view.setTopicContent(tc);
+                    view.setTopic(tc.getTopic());
+                    views.add(view);
+                }
+                userContentViewRepository.saveAll(views);
+            }
+
+            return contents.stream()
+                    .map(this::toResponse)
+                    .toList();
         }
+
+        // 2. STICKY LOAD (has topicIds and NOT refreshing): Stick to provided topics
+        List<Topic> topics = topicRepository.findAllById(topicIds);
+        if (topics.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<TopicContent> contents = topicContentRepository.findRandomByTopicIn(topics, pageable);
 
         if (contents == null || contents.isEmpty()) {
             return Collections.emptyList();
@@ -281,6 +392,124 @@ public class ContentFeedService {
         dto.setSource("API");
         dto.setCategoryName(c.getTopic().getCategory().getName());
         return dto;
+    }
+
+    public TopicSummary getNextTopicForUser(Long currentTopicId) {
+        UserProfile profile = getCurrentUserProfile();
+
+        // 1. Get user's preferred categories
+        List<UserPreference> prefs = userPreferenceRepository.findByUserProfile(profile);
+        List<ContentCategory> categories = prefs.stream()
+                .map(UserPreference::getCategory)
+                .distinct()
+                .toList();
+
+        if (categories.isEmpty()) {
+            throw new ResourceNotFoundException("No preferences found for user");
+        }
+
+        // 2. Get all topics for these categories
+        List<Topic> allTopics = topicRepository.findByCategoryIn(categories);
+        if (allTopics.isEmpty()) {
+            throw new ResourceNotFoundException("No topics found for preferences");
+        }
+
+        // 3. Filter out current topic if possible
+        List<Topic> candidates = new java.util.ArrayList<>(allTopics);
+        if (currentTopicId != null) {
+            candidates.removeIf(t -> t.getId().equals(currentTopicId));
+        }
+
+        // 4. Filter out recently viewed topics (avoid repetition)
+        // Fetch last 20 viewed topics
+        Pageable pageable = PageRequest.of(0, 20);
+        List<Long> recentTopicIds = userContentViewRepository.findRecentTopicIds(profile, pageable);
+
+        if (!recentTopicIds.isEmpty()) {
+            List<Topic> filteredCandidates = candidates.stream()
+                    .filter(t -> !recentTopicIds.contains(t.getId()))
+                    .collect(java.util.stream.Collectors.toList());
+
+            // Only apply filter if we still have candidates left
+            if (!filteredCandidates.isEmpty()) {
+                candidates = filteredCandidates;
+            }
+        }
+
+        // 5. Pick one random topic
+        if (candidates.isEmpty()) {
+            // Should not happen given logic above, but defensive fallback
+            candidates = allTopics;
+        }
+        Topic randomTopic = candidates.get(new java.util.Random().nextInt(candidates.size()));
+
+        // 6. Convert to TopicSummary
+        TopicSummary summary = new TopicSummary();
+        summary.setId(randomTopic.getId());
+        summary.setName(randomTopic.getName());
+        summary.setEmoji(randomTopic.getEmoji());
+        summary.setCategoryId(randomTopic.getCategory().getId());
+
+        return summary;
+    }
+
+    public TopicSummary getNextTopicForGuest(String guestUid, List<Long> seenTopicIds) {
+        // 1. Fetch all topics (or a large random subset)
+        List<Topic> allTopics = topicRepository.findAll();
+
+        if (allTopics.isEmpty()) {
+            throw new ResourceNotFoundException("No topics found");
+        }
+
+        // 2. Filter out seen topics (from payload AND from DB if guestUid exists)
+        List<Topic> candidates = new java.util.ArrayList<>(allTopics);
+
+        // Filter from payload
+        if (seenTopicIds != null && !seenTopicIds.isEmpty()) {
+            candidates.removeIf(t -> seenTopicIds.contains(t.getId()));
+        }
+
+        // Filter from DB if guestUid provided
+        if (guestUid != null && !guestUid.isEmpty()) {
+            UserProfile guestProfile = userProfileRepository.findByUid(guestUid).orElse(null);
+            if (guestProfile != null) {
+                Pageable pageable = PageRequest.of(0, 20);
+                List<Long> dbSeenIds = userContentViewRepository.findRecentTopicIds(guestProfile, pageable);
+                if (!dbSeenIds.isEmpty()) {
+                    candidates.removeIf(t -> dbSeenIds.contains(t.getId()));
+                }
+            }
+        }
+
+        // 3. Pick one random topic
+        if (candidates.isEmpty()) {
+            // Fallback: if user has seen everything, pick any random topic
+            candidates = allTopics;
+        }
+
+        Topic randomTopic = candidates.get(new java.util.Random().nextInt(candidates.size()));
+
+        // 4. Convert to TopicSummary
+        TopicSummary summary = new TopicSummary();
+        summary.setId(randomTopic.getId());
+        summary.setName(randomTopic.getName());
+        summary.setEmoji(randomTopic.getEmoji());
+        summary.setCategoryId(randomTopic.getCategory().getId());
+
+        return summary;
+    }
+
+    private UserProfile getOrCreateGuestProfile(String guestUid) {
+        return userProfileRepository.findByUid(guestUid)
+                .orElseGet(() -> {
+                    UserProfile newGuest = new UserProfile();
+                    newGuest.setUid(guestUid);
+                    newGuest.setFirebaseUid(guestUid); // Assuming same for anon
+                    newGuest.setDisplayName("Guest");
+                    newGuest.setStatus(in.bored.api.model.ProfileStatus.ACTIVE); // or GUEST if enum exists
+                    // Set other required fields if any
+                    return userProfileRepository.save(newGuest);
+                });
     }
 
     private ContentCategorySummary toCategorySummary(ContentCategory category) {

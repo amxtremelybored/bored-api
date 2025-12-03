@@ -16,4 +16,6 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, Long> 
     Page<UserProfile> findByStatusNot(ProfileStatus status, Pageable pageable);
 
     Optional<UserProfile> findByUidAndStatusNot(String uid, ProfileStatus status);
+
+    Optional<UserProfile> findByUid(String uid);
 }

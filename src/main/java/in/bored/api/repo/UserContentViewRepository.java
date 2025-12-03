@@ -2,7 +2,16 @@
 package in.bored.api.repo;
 
 import in.bored.api.model.UserContentView;
+import in.bored.api.model.UserProfile;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
 
 public interface UserContentViewRepository extends JpaRepository<UserContentView, Long> {
+
+    @Query("SELECT v.topic.id FROM UserContentView v WHERE v.userProfile = :profile ORDER BY v.viewedAt DESC")
+    List<Long> findRecentTopicIds(@Param("profile") UserProfile profile, Pageable pageable);
 }
