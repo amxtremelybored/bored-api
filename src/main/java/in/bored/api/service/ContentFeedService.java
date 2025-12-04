@@ -553,17 +553,30 @@ public class ContentFeedService {
         List<Long> recentTopicIds = userContentViewRepository.findRecentTopicIds(profile, pageable);
 
         if (!recentTopicIds.isEmpty()) {
-            List<Topic> filteredCandidates = candidates.stream()
-                    .filter(t -> !recentTopicIds.contains(t.getId()))
-                    .collect(java.util.stream.Collectors.toList());
-
-            // Only apply filter if we still have candidates left
-            // User request: "it should not show again" -> So we strictly filter.
-            // If filteredCandidates is empty, it means we have seen all topics.
-            candidates = filteredCandidates;
+            candidates.removeIf(t -> recentTopicIds.contains(t.getId()));
         }
 
-        // 5. Pick one random topic
+        // 5. If candidates empty, try falling back to ALL topics (including empty ones)
+        if (candidates.isEmpty()) {
+            logger.info("⚠️ No pre-loaded topics left for user. Falling back to ALL topics.");
+            List<Topic> fallbackTopics;
+            if (categories.isEmpty()) {
+                fallbackTopics = topicRepository.findAll();
+            } else {
+                fallbackTopics = topicRepository.findByCategoryIn(categories);
+            }
+
+            // Filter viewed again
+            candidates = new java.util.ArrayList<>(fallbackTopics);
+            if (currentTopicId != null) {
+                candidates.removeIf(t -> t.getId().equals(currentTopicId));
+            }
+            if (!recentTopicIds.isEmpty()) {
+                candidates.removeIf(t -> recentTopicIds.contains(t.getId()));
+            }
+        }
+
+        // 6. Pick one random topic
         if (candidates.isEmpty()) {
             // "return []" -> No new topics available.
             throw new TopicsExhaustedException("No new topics available");
@@ -597,15 +610,33 @@ public class ContentFeedService {
         }
 
         // Filter from DB if guestUid provided
+        List<Long> dbSeenIds = new java.util.ArrayList<>();
         if (guestUid != null && !guestUid.isEmpty()) {
             Pageable pageable = PageRequest.of(0, 10000);
-            List<Long> dbSeenIds = userContentViewRepository.findRecentTopicIdsForGuest(guestUid, pageable);
+            dbSeenIds = userContentViewRepository.findRecentTopicIdsForGuest(guestUid, pageable);
             if (!dbSeenIds.isEmpty()) {
-                candidates.removeIf(t -> dbSeenIds.contains(t.getId()));
+                final List<Long> finalDbSeenIds = dbSeenIds;
+                candidates.removeIf(t -> finalDbSeenIds.contains(t.getId()));
             }
         }
 
-        // 3. Pick one random topic
+        // 3. If candidates empty, fallback to ALL topics
+        if (candidates.isEmpty()) {
+            logger.info("⚠️ No pre-loaded topics left for guest. Falling back to ALL topics.");
+            List<Topic> fallbackTopics = topicRepository.findAll();
+            candidates = new java.util.ArrayList<>(fallbackTopics);
+
+            // Re-filter
+            if (seenTopicIds != null && !seenTopicIds.isEmpty()) {
+                candidates.removeIf(t -> seenTopicIds.contains(t.getId()));
+            }
+            if (!dbSeenIds.isEmpty()) {
+                final List<Long> finalDbSeenIds = dbSeenIds;
+                candidates.removeIf(t -> finalDbSeenIds.contains(t.getId()));
+            }
+        }
+
+        // 4. Pick one random topic
         if (candidates.isEmpty()) {
             // Fallback: if user has seen everything, return empty/error
             throw new TopicsExhaustedException("No new topics available");

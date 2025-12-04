@@ -12,6 +12,8 @@ public interface TopicRepository extends JpaRepository<Topic, Long> {
 
     List<Topic> findByCategoryInAndContentLoadedTrue(List<ContentCategory> categories);
 
+    List<Topic> findByCategoryIn(List<ContentCategory> categories);
+
     List<Topic> findAllByContentLoadedTrue();
 
     @Query(value = "SELECT * FROM topics WHERE is_content_loaded = true ORDER BY RANDOM() LIMIT 1", nativeQuery = true)
