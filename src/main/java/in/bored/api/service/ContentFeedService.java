@@ -542,8 +542,8 @@ public class ContentFeedService {
         }
 
         // 4. Filter out recently viewed topics (avoid repetition)
-        // Fetch last 20 viewed topics
-        Pageable pageable = PageRequest.of(0, 20);
+        // Fetch last 10000 viewed topics (effectively "all" for now)
+        Pageable pageable = PageRequest.of(0, 10000);
         List<Long> recentTopicIds = userContentViewRepository.findRecentTopicIds(profile, pageable);
 
         if (!recentTopicIds.isEmpty()) {
@@ -552,15 +552,15 @@ public class ContentFeedService {
                     .collect(java.util.stream.Collectors.toList());
 
             // Only apply filter if we still have candidates left
-            if (!filteredCandidates.isEmpty()) {
-                candidates = filteredCandidates;
-            }
+            // User request: "it should not show again" -> So we strictly filter.
+            // If filteredCandidates is empty, it means we have seen all topics.
+            candidates = filteredCandidates;
         }
 
         // 5. Pick one random topic
         if (candidates.isEmpty()) {
-            // Should not happen given logic above, but defensive fallback
-            candidates = allTopics;
+            // "return []" -> No new topics available.
+            throw new ResourceNotFoundException("No new topics available");
         }
         Topic randomTopic = candidates.get(new java.util.Random().nextInt(candidates.size()));
 
@@ -592,7 +592,7 @@ public class ContentFeedService {
 
         // Filter from DB if guestUid provided
         if (guestUid != null && !guestUid.isEmpty()) {
-            Pageable pageable = PageRequest.of(0, 20);
+            Pageable pageable = PageRequest.of(0, 10000);
             List<Long> dbSeenIds = userContentViewRepository.findRecentTopicIdsForGuest(guestUid, pageable);
             if (!dbSeenIds.isEmpty()) {
                 candidates.removeIf(t -> dbSeenIds.contains(t.getId()));
@@ -601,8 +601,8 @@ public class ContentFeedService {
 
         // 3. Pick one random topic
         if (candidates.isEmpty()) {
-            // Fallback: if user has seen everything, pick any random topic
-            candidates = allTopics;
+            // Fallback: if user has seen everything, return empty/error
+            throw new ResourceNotFoundException("No new topics available");
         }
 
         Topic randomTopic = candidates.get(new java.util.Random().nextInt(candidates.size()));
