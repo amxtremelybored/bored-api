@@ -560,7 +560,7 @@ public class ContentFeedService {
         // 5. Pick one random topic
         if (candidates.isEmpty()) {
             // "return []" -> No new topics available.
-            throw new ResourceNotFoundException("No new topics available");
+            throw new TopicsExhaustedException("No new topics available");
         }
         Topic randomTopic = candidates.get(new java.util.Random().nextInt(candidates.size()));
 
@@ -602,7 +602,7 @@ public class ContentFeedService {
         // 3. Pick one random topic
         if (candidates.isEmpty()) {
             // Fallback: if user has seen everything, return empty/error
-            throw new ResourceNotFoundException("No new topics available");
+            throw new TopicsExhaustedException("No new topics available");
         }
 
         Topic randomTopic = candidates.get(new java.util.Random().nextInt(candidates.size()));
