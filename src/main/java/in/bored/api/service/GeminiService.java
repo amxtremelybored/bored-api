@@ -136,6 +136,124 @@ public class GeminiService {
         }
     }
 
+    public List<in.bored.api.model.JokeContent> generateJoke(int count) {
+        String prompt = """
+                You are a witty comedian. Provide a list of simple, clean, and funny jokes suitable for all ages.
+                Each joke must be easy to understand and make people smile.
+                Generate exactly %d new and unique general jokes.
+                Each joke must have a short setup and a clear punchline.
+                Avoid offensive or adult content.
+                The response MUST be a JSON array formatted exactly according to the schema:
+                [{"setup": "string", "punchline": "string"}]
+                DO NOT include any text outside the JSON block.
+                """.formatted(count);
+
+        try {
+            String responseText = sendMessage("Generic Jokes", prompt);
+            if (responseText == null)
+                return List.of();
+            return parseGeminiJokeResponse(responseText);
+        } catch (Exception e) {
+            logger.error("Error generating jokes", e);
+            return List.of();
+        }
+    }
+
+    private List<in.bored.api.model.JokeContent> parseGeminiJokeResponse(String text) {
+        List<in.bored.api.model.JokeContent> jokes = new ArrayList<>();
+        try {
+            text = text.trim();
+            if (text.startsWith("```json"))
+                text = text.substring(7);
+            if (text.startsWith("```"))
+                text = text.substring(3);
+            if (text.endsWith("```"))
+                text = text.substring(0, text.length() - 3);
+            text = text.trim();
+
+            JsonNode root = objectMapper.readTree(text);
+            if (root.isArray()) {
+                for (JsonNode node : root) {
+                    in.bored.api.model.JokeContent joke = new in.bored.api.model.JokeContent();
+                    joke.setSetup(node.path("setup").asText());
+                    joke.setPunchline(node.path("punchline").asText());
+                    joke.setSource("Gemini");
+                    jokes.add(joke);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error parsing Gemini joke response: {}", e.getMessage());
+        }
+        return jokes;
+    }
+
+    public List<String> generateFun(int count) {
+        String prompt = """
+                You are a witty comedian. Provide a list of clean, witty, hilarious anecdotes and gag-type jokes.
+                Generate exactly %d new and unique items.
+                Each item should be concise (1-4 sentences), engaging, and include at least one emoji.
+                Avoid "Why did..." style jokes.
+                The response MUST be a JSON array of strings.
+                Example: ["🎭 When the mouse went to the bar...", "Another anecdote..."]
+                DO NOT include any text outside the JSON block.
+                """.formatted(count);
+
+        try {
+            String responseText = sendMessage("Anecdotes", prompt);
+            if (responseText == null)
+                return List.of();
+            return parseGeminiStringListResponse(responseText);
+        } catch (Exception e) {
+            logger.error("Error generating fun content", e);
+            return List.of();
+        }
+    }
+
+    public List<String> generateDoYouKnow(int count) {
+        String prompt = """
+                Generate exactly %d unique "Do You Know" facts about general knowledge (Space, History, Science, Nature, etc.).
+                Each fact must be concise, interesting, and formatted as a single, engaging sentence or short paragraph (max 3 sentences).
+                The response MUST be a JSON array of strings.
+                Example: ["Did you know that honey never spoils?", "Another fact..."]
+                DO NOT include any text outside the JSON block.
+                """
+                .formatted(count);
+
+        try {
+            String responseText = sendMessage("General Facts", prompt);
+            if (responseText == null)
+                return List.of();
+            return parseGeminiStringListResponse(responseText);
+        } catch (Exception e) {
+            logger.error("Error generating do you know content", e);
+            return List.of();
+        }
+    }
+
+    private List<String> parseGeminiStringListResponse(String text) {
+        List<String> items = new ArrayList<>();
+        try {
+            text = text.trim();
+            if (text.startsWith("```json"))
+                text = text.substring(7);
+            if (text.startsWith("```"))
+                text = text.substring(3);
+            if (text.endsWith("```"))
+                text = text.substring(0, text.length() - 3);
+            text = text.trim();
+
+            JsonNode root = objectMapper.readTree(text);
+            if (root.isArray()) {
+                for (JsonNode node : root) {
+                    items.add(node.asText());
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error parsing Gemini string list response: {}", e.getMessage());
+        }
+        return items;
+    }
+
     private String sendMessage(String topic, String prompt) throws IOException, InterruptedException {
         String safePrompt = prompt.replace("\"", "\\\"").replace("\n", "\\n");
         String requestBody = """

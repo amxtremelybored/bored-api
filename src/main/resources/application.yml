@@ -4,7 +4,7 @@ server:
 
 gemini:
   api:
-    key: AIzaSyCvoqBMLpY2WZBfgkfwHHuob41DjLFJork
+    key: AIzaSyDok4UafisypABFS-06n7rNhQCNJQ8qj4U
 spring:
   datasource:
     url: jdbc:postgresql://192.168.4.44:5432/bored
