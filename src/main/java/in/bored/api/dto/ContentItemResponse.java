@@ -14,6 +14,7 @@ public class ContentItemResponse {
     private OffsetDateTime createdAt;
     private String source;
     private String categoryName;
+    private String topicDisplayName;
 
     // getters/setters
     public Long getId() {
@@ -86,5 +87,13 @@ public class ContentItemResponse {
 
     public void setCategoryName(String categoryName) {
         this.categoryName = categoryName;
+    }
+
+    public String getTopicDisplayName() {
+        return topicDisplayName;
+    }
+
+    public void setTopicDisplayName(String topicDisplayName) {
+        this.topicDisplayName = topicDisplayName;
     }
 }

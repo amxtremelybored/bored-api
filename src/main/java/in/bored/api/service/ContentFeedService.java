@@ -518,6 +518,7 @@ public class ContentFeedService {
         dto.setId(c.getId());
         dto.setTopicId(c.getTopic().getId());
         dto.setTopicName(c.getTopic().getName());
+        dto.setTopicDisplayName(c.getTopic().getDisplayName());
         dto.setTopicEmoji(c.getTopic().getEmoji());
         dto.setContentIndex(c.getContentIndex());
         dto.setContent(c.getContent());
