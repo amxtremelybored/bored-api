@@ -1,6 +1,10 @@
 server:
   port: 7082
   address: 0.0.0.0
+
+gemini:
+  api:
+    key: AIzaSyCvoqBMLpY2WZBfgkfwHHuob41DjLFJork
 spring:
   datasource:
     url: jdbc:postgresql://192.168.4.44:5432/bored
