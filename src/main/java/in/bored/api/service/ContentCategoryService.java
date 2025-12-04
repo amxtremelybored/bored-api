@@ -24,7 +24,7 @@ public class ContentCategoryService {
 
     @Transactional(readOnly = true)
     public List<ContentCategoryResponse> getAll() {
-        return repository.findAllByContentLoadedTrue()
+        return repository.findAll()
                 .stream()
                 .map(this::toResponse)
                 .toList();
