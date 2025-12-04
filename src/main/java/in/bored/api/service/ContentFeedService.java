@@ -78,12 +78,15 @@ public class ContentFeedService {
                     .distinct()
                     .toList();
 
+            // 2. Get all topics for these categories
+            List<Topic> allTopics;
             if (categories.isEmpty()) {
-                return Collections.emptyList();
+                // No preferences -> Use ALL topics
+                allTopics = topicRepository.findAllByContentLoadedTrue();
+            } else {
+                allTopics = topicRepository.findByCategoryInAndContentLoadedTrue(categories);
             }
 
-            // 2. Get all topics for these categories
-            List<Topic> allTopics = topicRepository.findByCategoryInAndContentLoadedTrue(categories);
             if (allTopics.isEmpty()) {
                 return Collections.emptyList();
             }
@@ -525,14 +528,17 @@ public class ContentFeedService {
                 .distinct()
                 .toList();
 
+        // 2. Get all topics for these categories
+        List<Topic> allTopics;
         if (categories.isEmpty()) {
-            throw new ResourceNotFoundException("No preferences found for user");
+            // No preferences (e.g. new guest) -> Use ALL topics
+            allTopics = topicRepository.findAllByContentLoadedTrue();
+        } else {
+            allTopics = topicRepository.findByCategoryInAndContentLoadedTrue(categories);
         }
 
-        // 2. Get all topics for these categories
-        List<Topic> allTopics = topicRepository.findByCategoryInAndContentLoadedTrue(categories);
         if (allTopics.isEmpty()) {
-            throw new ResourceNotFoundException("No topics found for preferences");
+            throw new ResourceNotFoundException("No topics found");
         }
 
         // 3. Filter out current topic if possible
@@ -637,7 +643,14 @@ public class ContentFeedService {
     private UserProfile getCurrentUserProfile() {
         String uid = getCurrentUid();
         return userProfileRepository.findByUidAndStatusNot(uid, ProfileStatus.DELETED)
-                .orElseThrow(() -> new ResourceNotFoundException("UserProfile not found or deleted for uid: " + uid));
+                .orElseGet(() -> {
+                    // Auto-create profile for new users (including guests)
+                    logger.info("Creating new UserProfile for uid: {}", uid);
+                    UserProfile newProfile = new UserProfile();
+                    newProfile.setUid(uid);
+                    newProfile.setStatus(ProfileStatus.ACTIVE);
+                    return userProfileRepository.save(newProfile);
+                });
     }
 
     private String getCurrentUid() {
