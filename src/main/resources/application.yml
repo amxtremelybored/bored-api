@@ -7,9 +7,9 @@ gemini:
     key: AIzaSyDok4UafisypABFS-06n7rNhQCNJQ8qj4U
 spring:
   datasource:
-    url: jdbc:postgresql://192.168.4.44:5432/bored
-    username: postgres
-    password: secret123
+    url: jdbc:postgresql://82.25.110.235:5432/bored
+    username: boredapp
+    password: xecsaV-5kojfu-dinnuj
     driver-class-name: org.postgresql.Driver
     hikari:
       keepalive-time: 300000   # 5 min ping to prevent idle disconnects
