@@ -23,7 +23,7 @@ public class GeminiService {
 
     private static final Logger logger = LoggerFactory.getLogger(GeminiService.class);
 
-    private static final String GEMINI_API_KEY = "AIzaSyA9u1OS2ViiXLqoQiD20n4YOaN7mKmJii4";
+    private static final String GEMINI_API_KEY = "AIzaSyC6whpZnxGoQS7JFkpKSUvb8hxTWj_3anc";
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
     // Using the specific preview model available to this key
     private static final String MODEL = "gemini-2.5-flash-lite-preview-09-2025";
