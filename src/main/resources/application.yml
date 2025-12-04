@@ -5,16 +5,19 @@ server:
 gemini:
   api:
     key: ${GEMINI_API_KEY}
+
 spring:
   datasource:
     url: jdbc:postgresql://${DB_HOST:82.25.110.235}:${DB_PORT:5432}/${DB_NAME:bored}
     username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
-      keepalive-time: 300000   # 5 min ping to prevent idle disconnects
-      validation-timeout: 5000 # safety timeout
-      leak-detection-threshold: 60000 # optional, 60s for debugging
+      keepalive-time: 300000   # 5 min ping
+      validation-timeout: 5000
+      leak-detection-threshold: 60000
   jpa:
     hibernate:
       ddl-auto: none
     show-sql: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
