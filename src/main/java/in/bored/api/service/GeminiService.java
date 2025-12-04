@@ -44,15 +44,24 @@ public class GeminiService {
             if (responseText == null)
                 return List.of();
 
+            // Clean markdown before parsing
+            String cleanText = responseText.trim();
+            if (cleanText.startsWith("```json"))
+                cleanText = cleanText.substring(7);
+            if (cleanText.startsWith("```"))
+                cleanText = cleanText.substring(3);
+            if (cleanText.endsWith("```"))
+                cleanText = cleanText.substring(0, cleanText.length() - 3);
+            cleanText = cleanText.trim();
+
             // Parse JSON array of strings
-            JsonNode root = objectMapper.readTree(responseText);
+            JsonNode root = objectMapper.readTree(cleanText);
             List<ContentItemResponse> results = new ArrayList<>();
 
-            // Handle if response is wrapped in markdown code block
+            // Handle if response is wrapped in markdown code block (double check)
             if (root.isTextual()) {
-                // Try to parse the text if it's a string containing JSON
                 String text = root.asText();
-                // clean markdown
+                // clean markdown again if nested
                 if (text.startsWith("```json"))
                     text = text.substring(7);
                 if (text.startsWith("```"))
