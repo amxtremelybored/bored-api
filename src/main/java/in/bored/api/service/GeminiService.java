@@ -23,7 +23,7 @@ public class GeminiService {
 
     private static final Logger logger = LoggerFactory.getLogger(GeminiService.class);
 
-    private static final String GEMINI_API_KEY = "AIzaSyCZeP9X9QqErXNI0tyM7PBjxBWWct2bxBs";
+    private static final String GEMINI_API_KEY = "AIzaSyCvoqBMLpY2WZBfgkfwHHuob41DjLFJork";
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
     // Using the specific preview model available to this key
     private static final String MODEL = "gemini-2.5-flash-lite-preview-09-2025";
@@ -137,6 +137,119 @@ public class GeminiService {
             }
         } catch (Exception e) {
             logger.error("❌ Error parsing Gemini response", e);
+        }
+        return results;
+    }
+
+    public List<in.bored.api.dto.QuizResponse> generateQuiz(String topicName, int count, int setNumber) {
+        try {
+            String prompt = buildQuizPrompt(topicName, count, setNumber);
+            String requestBody = buildRequestBody(prompt);
+
+            logger.info("🤖 Calling Gemini API for Quiz topic: '{}', count: {}", topicName, count);
+
+            String url = String.format("%s/models/%s:generateContent?key=%s", GEMINI_BASE_URL, MODEL, GEMINI_API_KEY);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                logger.info("✅ Gemini API response received successfully for Quiz topic: '{}'", topicName);
+                return parseGeminiQuizResponse(response.body(), topicName);
+            } else {
+                logger.error("❌ Gemini API Error: {} {}", response.statusCode(), response.body());
+                return Collections.emptyList();
+            }
+
+        } catch (Exception e) {
+            logger.error("❌ Exception while calling Gemini API for Quiz", e);
+            return Collections.emptyList();
+        }
+    }
+
+    private String buildQuizPrompt(String randomTopic, int count, int setNumber) {
+        return String.format(
+                """
+                        Generate exactly %d multiple-choice quiz questions about **%s** for **Set %d**.
+                        The questions must be unique, non-trivial, and completely distinct from any previous questions you may have generated. This set number ensures we get fresh content.
+
+                        MOBILE CONSTRAINTS (VERY IMPORTANT):
+                        - Each question MUST be short and fit on a phone screen easily.
+                        - Max ~120 characters per question.
+                        - No line breaks or paragraphs inside the question.
+                        - Each option MUST be a short phrase (max ~35 characters).
+                        - No line breaks or extra formatting in options.
+                        - Do NOT prefix options with letters or numbers (no "A)", "1.", etc.).
+
+                        The response MUST be a single JSON object in this exact shape:
+                        {
+                          "questions": [
+                            {
+                              "question": "The question text 1",
+                              "options": ["Option A", "Option B", "Option C", "Option D"],
+                              "correct_answer": "The text of the correct option"
+                            }
+                          ]
+                        }
+
+                        Rules:
+                        - Questions must be simple, fun and suitable for a casual quiz app.
+                        - Avoid offensive or adult content.
+                        - DO NOT include any introductory or explanatory text outside the JSON object.
+                        """,
+                count, randomTopic, setNumber);
+    }
+
+    private List<in.bored.api.dto.QuizResponse> parseGeminiQuizResponse(String jsonResponse, String topicName) {
+        List<in.bored.api.dto.QuizResponse> results = new ArrayList<>();
+        try {
+            JsonNode root = objectMapper.readTree(jsonResponse);
+            JsonNode candidates = root.path("candidates");
+            if (candidates.isArray() && candidates.size() > 0) {
+                JsonNode content = candidates.get(0).path("content");
+                JsonNode parts = content.path("parts");
+                if (parts.isArray() && parts.size() > 0) {
+                    String text = parts.get(0).path("text").asText();
+
+                    // Clean up potential markdown code blocks
+                    text = text.trim();
+                    if (text.startsWith("```json")) {
+                        text = text.substring(7);
+                    } else if (text.startsWith("```")) {
+                        text = text.substring(3);
+                    }
+                    if (text.endsWith("```")) {
+                        text = text.substring(0, text.length() - 3);
+                    }
+                    text = text.trim();
+
+                    JsonNode jsonRoot = objectMapper.readTree(text);
+                    JsonNode questionsArray = jsonRoot.path("questions");
+
+                    if (questionsArray.isArray()) {
+                        for (JsonNode qNode : questionsArray) {
+                            in.bored.api.dto.QuizResponse item = new in.bored.api.dto.QuizResponse();
+                            // item.setId(...) - ID will be generated by DB
+                            item.setCategoryName(topicName); // Using topic as category name for now
+                            item.setQuestion(qNode.path("question").asText());
+                            item.setAnswer(qNode.path("correct_answer").asText());
+
+                            ArrayNode optionsNode = (ArrayNode) qNode.path("options");
+                            item.setOptions(optionsNode.toString()); // Store as JSON string
+
+                            item.setDifficultyLevel(1);
+                            results.add(item);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.error("❌ Error parsing Gemini Quiz response", e);
         }
         return results;
     }
