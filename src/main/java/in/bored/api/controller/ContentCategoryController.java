@@ -39,7 +39,7 @@ public class ContentCategoryController {
 
     @PutMapping("/{id}")
     public ResponseEntity<ContentCategoryResponse> update(@PathVariable UUID id,
-                                                          @RequestBody ContentCategoryRequest request) {
+            @RequestBody ContentCategoryRequest request) {
         ContentCategoryResponse updated = service.update(id, request);
         return ResponseEntity.ok(updated);
     }
@@ -47,6 +47,12 @@ public class ContentCategoryController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         service.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}/preference")
+    public ResponseEntity<Void> removePreference(@PathVariable UUID id) {
+        service.removePreference(id);
         return ResponseEntity.noContent().build();
     }
 }

@@ -67,4 +67,5 @@ public interface TopicContentRepository extends JpaRepository<TopicContent, Long
   @Query("SELECT MAX(tc.contentIndex) FROM TopicContent tc WHERE tc.topic = :topic")
   Integer findMaxContentIndexByTopic(@Param("topic") Topic topic);
 
+  void deleteByTopic(Topic topic);
 }

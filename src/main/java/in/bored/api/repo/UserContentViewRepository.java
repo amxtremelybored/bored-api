@@ -17,4 +17,6 @@ public interface UserContentViewRepository extends JpaRepository<UserContentView
 
     @Query("SELECT v.topic.id FROM UserContentView v WHERE v.guestUid = :guestUid ORDER BY v.viewedAt DESC")
     List<Long> findRecentTopicIdsForGuest(@Param("guestUid") String guestUid, Pageable pageable);
+
+    void deleteByTopic(in.bored.api.model.Topic topic);
 }
