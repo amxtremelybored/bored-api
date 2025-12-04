@@ -59,7 +59,15 @@ public class UserProfileService {
 
     public UserProfile getCurrentUserProfile() {
         String uid = getCurrentUid();
-        return getByUid(uid);
+        return userProfileRepository.findByUidAndStatusNot(uid, ProfileStatus.DELETED)
+                .orElseGet(() -> {
+                    // Auto-create profile for new users (including guests)
+                    UserProfile newProfile = new UserProfile();
+                    newProfile.setUid(uid);
+                    newProfile.setFirebaseUid(uid);
+                    newProfile.setStatus(ProfileStatus.ACTIVE);
+                    return userProfileRepository.save(newProfile);
+                });
     }
 
     /**
@@ -73,8 +81,8 @@ public class UserProfileService {
                 .findByUidAndStatusNot(firebaseUid, ProfileStatus.DELETED)
                 .orElseGet(() -> {
                     UserProfile p = new UserProfile();
-                    p.setUid(firebaseUid);          // MAIN UID = Firebase UID
-                    p.setFirebaseUid(firebaseUid);  // store in firebase_uid column too
+                    p.setUid(firebaseUid); // MAIN UID = Firebase UID
+                    p.setFirebaseUid(firebaseUid); // store in firebase_uid column too
                     p.setStatus(ProfileStatus.ACTIVE);
                     return p;
                 });

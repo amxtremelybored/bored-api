@@ -648,6 +648,7 @@ public class ContentFeedService {
                     logger.info("Creating new UserProfile for uid: {}", uid);
                     UserProfile newProfile = new UserProfile();
                     newProfile.setUid(uid);
+                    newProfile.setFirebaseUid(uid); // Mandatory field
                     newProfile.setStatus(ProfileStatus.ACTIVE);
                     return userProfileRepository.save(newProfile);
                 });
