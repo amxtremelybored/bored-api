@@ -88,6 +88,15 @@ public class ContentFeedService {
             }
 
             if (allTopics.isEmpty()) {
+                // Fallback: No loaded topics? Try ALL topics for these categories
+                if (categories.isEmpty()) {
+                    allTopics = topicRepository.findAll();
+                } else {
+                    allTopics = topicRepository.findByCategoryIn(categories);
+                }
+            }
+
+            if (allTopics.isEmpty()) {
                 return Collections.emptyList();
             }
 
@@ -535,10 +544,6 @@ public class ContentFeedService {
             allTopics = topicRepository.findAllByContentLoadedTrue();
         } else {
             allTopics = topicRepository.findByCategoryInAndContentLoadedTrue(categories);
-        }
-
-        if (allTopics.isEmpty()) {
-            throw new ResourceNotFoundException("No topics found");
         }
 
         // 3. Filter out current topic if possible
