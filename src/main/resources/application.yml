@@ -4,12 +4,11 @@ server:
 
 gemini:
   api:
-    key: AIzaSyDok4UafisypABFS-06n7rNhQCNJQ8qj4U
+    key: ${GEMINI_API_KEY}
 spring:
   datasource:
-    url: jdbc:postgresql://82.25.110.235:5432/bored
-    username: boredapp
-    password: xecsaV-5kojfu-dinnuj
+    url: jdbc:postgresql://${DB_HOST:82.25.110.235}:${DB_PORT:5432}/${DB_NAME:bored}
+    username: ${DB_USERNAME}
     driver-class-name: org.postgresql.Driver
     hikari:
       keepalive-time: 300000   # 5 min ping to prevent idle disconnects
