@@ -239,6 +239,27 @@ public class GeminiService {
         }
     }
 
+    public List<String> generateHealthWellnessTip(String topic, int count) {
+        String prompt = """
+                Provide exactly %d simple, practical and safe everyday tips about %s (general lifestyle only – no medical diagnosis or treatment).
+                Each tip should be concise (1–3 sentences), encouraging, and include at least one emoji.
+                The response MUST be a JSON array of strings.
+                Example: ["💧 Drink water regularly...", "Another tip..."]
+                DO NOT include any text outside the JSON block.
+                """
+                .formatted(count, topic);
+
+        try {
+            String responseText = sendMessage(topic, prompt);
+            if (responseText == null)
+                return List.of();
+            return parseGeminiStringListResponse(responseText);
+        } catch (Exception e) {
+            logger.error("Error generating health wellness content", e);
+            return List.of();
+        }
+    }
+
     private List<String> parseGeminiStringListResponse(String text) {
         List<String> items = new ArrayList<>();
         try {
