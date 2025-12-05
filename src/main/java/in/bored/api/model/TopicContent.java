@@ -26,7 +26,7 @@ public class TopicContent {
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
 
-    @Column(name = "source")
+    @Transient
     private String source;
 
     @PrePersist
