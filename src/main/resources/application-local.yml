@@ -4,7 +4,7 @@ server:
 
 gemini:
   api:
-    key: {KEY}
+    key: {PUT_YOUR_KEY_HERE_FOR_LOCAL}
 spring:
   datasource:
     url: jdbc:postgresql://82.25.110.235:5432/bored

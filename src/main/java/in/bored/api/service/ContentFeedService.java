@@ -708,19 +708,14 @@ public class ContentFeedService {
     // ---------------------------------------------------------
     // 4) SEARCH (Unified: DB -> Gemini)
     // ---------------------------------------------------------
+    // Unified Search with Logging
     public List<ContentItemResponse> searchContent(String query, int size, String guestUid) {
-        if (query == null || query.trim().isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        String trimmedQuery = query.trim();
-
-        // 1. Try to find a matching topic in DB
+        String trimmedQuery = (query == null || query.trim().isEmpty()) ? "" : query.trim();
         if (trimmedQuery.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // Resolve UserProfile if authenticated
+        // Resolve UserProfile if authenticated logic remains same...
         UserProfile user = null;
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -728,7 +723,7 @@ public class ContentFeedService {
                 user = getCurrentUserProfile();
             }
         } catch (Exception e) {
-            // Ignore auth errors, treat as guest
+            // Ignore
         }
 
         // 📝 Log the search
@@ -742,61 +737,43 @@ public class ContentFeedService {
             logger.error("Failed to log search query", e);
         }
 
-        // 1. Search locally in Topics
-        // Try strict match first, then containing
-        List<Topic> matchingTopics = topicRepository.findByNameContainingIgnoreCase(trimmedQuery);
-        Topic selectedTopic = null;
-
-        if (!matchingTopics.isEmpty()) {
-            selectedTopic = matchingTopics.get(0);
-        }
-
-        // 2. If we found a topic, check if it has content
-        if (selectedTopic != null) {
-            // Check if we have enough content? Or just return what we have?
-            // Let's rely on random fetch.
-            Pageable pageable = PageRequest.of(0, size);
-            List<TopicContent> contents = topicContentRepository
-                    .findRandomByTopicIn(Collections.singletonList(selectedTopic), pageable);
-
-            if (!contents.isEmpty()) {
-                return contents.stream().map(this::mapToResponse).toList();
-            }
-        }
-
-        // 3. Fallback: Gemini
+        // ⚡️ DIRECT AI SEARCH (No DB Topic Lookup)
         try {
+            // 1. Get raw JSON from Gemini
             String generatedJson = geminiService.generateContent(trimmedQuery, size);
 
-            if (selectedTopic == null) {
-                // If DB didn't find a topic, just return parsed content without saving (as per
-                // previous fix discussion)
-                // OR create a new topic if desired. For now, sticking to previous transient
-                // behavior
-                // unless we want to auto-create topics from search (which can pollute DB).
-                return geminiService.parseContent(generatedJson, trimmedQuery);
-            } else {
-                // We have a topic, update it with new content
-                List<ContentItemResponse> newItems = geminiService.parseContent(generatedJson, selectedTopic.getName());
+            // 2. Parse JSON to Objects
+            List<ContentItemResponse> generatedItems = geminiService.parseContent(generatedJson, trimmedQuery);
 
-                Integer maxIndex = topicContentRepository.findMaxContentIndexByTopic(selectedTopic);
-                int nextIndex = (maxIndex == null) ? 0 : maxIndex + 1;
+            // Assign dummy IDs and Index to avoid Flutter Null check errors
+            long dummyIdCounter = System.currentTimeMillis();
+            int indexCounter = 0;
 
-                List<TopicContent> newContents = new ArrayList<>();
-                for (ContentItemResponse item : newItems) {
-                    TopicContent tc = new TopicContent();
-                    tc.setTopic(selectedTopic);
-                    tc.setContent(item.getContent());
-                    tc.setContentIndex(nextIndex++);
-                    tc.setSource("Gemini (Search)");
-                    newContents.add(tc);
+            for (ContentItemResponse item : generatedItems) {
+                // Ensure ID is not null (Flutter expects int)
+                if (item.getId() == null) {
+                    item.setId(dummyIdCounter++);
                 }
-                topicContentRepository.saveAll(newContents);
 
-                return newItems;
+                // Ensure ContentIndex is not null
+                if (item.getContentIndex() == null) {
+                    item.setContentIndex(indexCounter++);
+                }
+
+                // Ensure TopicID is not null (use 0 or -1 for transient)
+                if (item.getTopicId() == null) {
+                    item.setTopicId(0L);
+                }
+
+                item.setSource("Gemini (Direct)");
+                item.setTopicName(trimmedQuery);
+                item.setTopicDisplayName("Search: " + trimmedQuery);
             }
+
+            return generatedItems;
+
         } catch (Exception e) {
-            logger.error("Search fallback failed", e);
+            logger.error("Direct search failed", e);
             return Collections.emptyList();
         }
     }
