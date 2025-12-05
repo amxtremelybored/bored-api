@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -798,14 +799,20 @@ public class ContentFeedService {
                 // We have a topic, we can save the new content to it!
                 List<ContentItemResponse> newItems = geminiService.parseContent(generatedJson, selectedTopic.getName());
 
-                // Save these items to the DB under selectedTopic
+                // Calculate next content index
+                Integer maxIndex = topicContentRepository.findMaxContentIndexByTopic(selectedTopic);
+                int nextIndex = (maxIndex == null) ? 0 : maxIndex + 1;
+
+                List<TopicContent> newContents = new ArrayList<>();
                 for (ContentItemResponse item : newItems) {
                     TopicContent tc = new TopicContent();
                     tc.setTopic(selectedTopic);
                     tc.setContent(item.getContent());
+                    tc.setContentIndex(nextIndex++);
                     tc.setSource("Gemini (Search)");
-                    topicContentRepository.save(tc);
+                    newContents.add(tc);
                 }
+                topicContentRepository.saveAll(newContents);
 
                 return newItems;
             }

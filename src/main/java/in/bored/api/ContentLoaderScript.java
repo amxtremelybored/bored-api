@@ -34,6 +34,7 @@ public class ContentLoaderScript {
         SpringApplication app = new SpringApplication(BoredApiApplication.class);
         app.setWebApplicationType(WebApplicationType.NONE); // Do not start web server
         app.setBannerMode(Banner.Mode.OFF);
+        app.setAdditionalProfiles("local"); // Activate 'application-local.yml' automatically
         // Disable Flyway/Liquibase if needed, or let them run to ensure schema is up to
         // date.
 
@@ -74,7 +75,8 @@ public class ContentLoaderScript {
 
                 for (int b = 1; b <= batches; b++) {
                     try {
-                        logger.info("      Batch {}/{}: Requesting {} items...", b, batches, batchSize);
+                        logger.info("      🚀 [{} > {}] Batch {}/{}: Requesting {} items...", category.getName(),
+                                topic.getName(), b, batches, batchSize);
                         List<ContentItemResponse> items = geminiService.generateContent(
                                 topic.getName(),
                                 category.getName(),
@@ -100,15 +102,18 @@ public class ContentLoaderScript {
                         }
 
                         topicContentRepo.saveAll(newContents);
+
+                        // Log the loaded content for visibility
+                        for (TopicContent tc : newContents) {
+                            // Truncate if too long for clean logs, or show mostly full if short facts
+                            String text = tc.getContent().replace("\n", " ");
+                            if (text.length() > 80)
+                                text = text.substring(0, 77) + "...";
+                            logger.info("          🔹 {}", text);
+                        }
+
                         logger.info("      ✅ Saved batch {} ({} items). Total so far: {}", b, newContents.size(),
                                 (b * batchSize));
-
-                        // Mark topic as loaded (in case it wasn't)
-                        if (!topic.isContentLoaded()) {
-                            topic.setContentLoaded(true);
-                            topic.setContentLoadedAt(OffsetDateTime.now());
-                            topicRepo.save(topic);
-                        }
 
                         // Small delay between batches to be nice to the API
                         Thread.sleep(1500);
@@ -116,6 +121,14 @@ public class ContentLoaderScript {
                     } catch (Exception e) {
                         logger.error("      ❌ Error in batch {} for topic {}: {}", b, topic.getName(), e.getMessage());
                     }
+                }
+
+                // Mark topic as loaded (after attempting all batches)
+                if (!topic.isContentLoaded()) {
+                    topic.setContentLoaded(true);
+                    topic.setContentLoadedAt(OffsetDateTime.now());
+                    topicRepo.save(topic);
+                    logger.info("      🏁 Marked topic {} as loaded.", topic.getName());
                 }
             }
 
