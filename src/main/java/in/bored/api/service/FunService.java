@@ -51,7 +51,7 @@ public class FunService {
 
         // 2. If none, generate new fun items via Gemini
         logger.info("No unseen fun content for user {}, generating more...", user.getId());
-        generateAndSaveFun(5);
+        generateAndSaveFun(10);
 
         // 3. Try fetching again
         return contentRepository.findRandomUnseen(user.getId()).orElse(null);

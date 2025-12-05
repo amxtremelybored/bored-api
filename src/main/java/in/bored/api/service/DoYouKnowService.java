@@ -51,7 +51,7 @@ public class DoYouKnowService {
 
         // 2. If none, generate new facts via Gemini
         logger.info("No unseen facts for user {}, generating more...", user.getId());
-        generateAndSaveDoYouKnow(5);
+        generateAndSaveDoYouKnow(10);
 
         // 3. Try fetching again
         return contentRepository.findRandomUnseen(user.getId()).orElse(null);

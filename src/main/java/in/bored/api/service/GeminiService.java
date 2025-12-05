@@ -76,16 +76,7 @@ public class GeminiService {
             if (jsonText == null)
                 return List.of();
 
-            // Clean markdown before parsing
-            String cleanText = jsonText.trim();
-            if (cleanText.startsWith("```json"))
-                cleanText = cleanText.substring(7);
-            if (cleanText.startsWith("```"))
-                cleanText = cleanText.substring(3);
-            if (cleanText.endsWith("```"))
-                cleanText = cleanText.substring(0, cleanText.length() - 3);
-            cleanText = cleanText.trim();
-
+            String cleanText = cleanJson(jsonText);
             // Parse JSON array of strings
             JsonNode root = objectMapper.readTree(cleanText);
             List<ContentItemResponse> results = new ArrayList<>();
@@ -93,14 +84,8 @@ public class GeminiService {
             // Handle if response is wrapped in markdown code block (double check)
             if (root.isTextual()) {
                 String text = root.asText();
-                // clean markdown again if nested
-                if (text.startsWith("```json"))
-                    text = text.substring(7);
-                if (text.startsWith("```"))
-                    text = text.substring(3);
-                if (text.endsWith("```"))
-                    text = text.substring(0, text.length() - 3);
-                root = objectMapper.readTree(text.trim());
+                String innerClean = cleanJson(text);
+                root = objectMapper.readTree(innerClean);
             }
 
             if (root.isArray()) {
@@ -118,6 +103,44 @@ public class GeminiService {
             logger.error("Error parsing content", e);
             return List.of();
         }
+    }
+
+    private String cleanJson(String text) {
+        if (text == null)
+            return "";
+        text = text.trim();
+
+        // Find start and end of JSON content
+        int arrayStart = text.indexOf('[');
+        int objectStart = text.indexOf('{');
+        int start = -1;
+
+        if (arrayStart != -1 && objectStart != -1) {
+            start = Math.min(arrayStart, objectStart);
+        } else if (arrayStart != -1) {
+            start = arrayStart;
+        } else if (objectStart != -1) {
+            start = objectStart;
+        }
+
+        if (start != -1) {
+            int arrayEnd = text.lastIndexOf(']');
+            int objectEnd = text.lastIndexOf('}');
+            int end = Math.max(arrayEnd, objectEnd);
+
+            if (end > start) {
+                return text.substring(start, end + 1);
+            }
+        }
+
+        // Fallback cleanup if proper start/end not found
+        if (text.startsWith("```json"))
+            text = text.substring(7);
+        if (text.startsWith("```"))
+            text = text.substring(3);
+        if (text.endsWith("```"))
+            text = text.substring(0, text.length() - 3);
+        return text.trim();
     }
 
     public List<QuizResponse> generateQuiz(String topicName, int count, int setNumber) {
@@ -202,16 +225,8 @@ public class GeminiService {
     private List<in.bored.api.model.JokeContent> parseGeminiJokeResponse(String text) {
         List<in.bored.api.model.JokeContent> jokes = new ArrayList<>();
         try {
-            text = text.trim();
-            if (text.startsWith("```json"))
-                text = text.substring(7);
-            if (text.startsWith("```"))
-                text = text.substring(3);
-            if (text.endsWith("```"))
-                text = text.substring(0, text.length() - 3);
-            text = text.trim();
-
-            JsonNode root = objectMapper.readTree(text);
+            String cleanText = cleanJson(text);
+            JsonNode root = objectMapper.readTree(cleanText);
             if (root.isArray()) {
                 for (JsonNode node : root) {
                     in.bored.api.model.JokeContent joke = new in.bored.api.model.JokeContent();
@@ -294,16 +309,8 @@ public class GeminiService {
     private List<String> parseGeminiStringListResponse(String text) {
         List<String> items = new ArrayList<>();
         try {
-            text = text.trim();
-            if (text.startsWith("```json"))
-                text = text.substring(7);
-            if (text.startsWith("```"))
-                text = text.substring(3);
-            if (text.endsWith("```"))
-                text = text.substring(0, text.length() - 3);
-            text = text.trim();
-
-            JsonNode root = objectMapper.readTree(text);
+            String cleanText = cleanJson(text);
+            JsonNode root = objectMapper.readTree(cleanText);
             if (root.isArray()) {
                 for (JsonNode node : root) {
                     items.add(node.asText());
@@ -359,47 +366,33 @@ public class GeminiService {
     private List<QuizResponse> parseGeminiQuizResponse(String text, String categoryName) {
         List<QuizResponse> responses = new ArrayList<>();
         try {
-            text = text.trim();
-            if (text.startsWith("```json"))
-                text = text.substring(7);
-            if (text.startsWith("```"))
-                text = text.substring(3);
-            if (text.endsWith("```"))
-                text = text.substring(0, text.length() - 3);
-            text = text.trim();
+            String cleanJson = cleanJson(text);
+            JsonNode root = objectMapper.readTree(cleanJson);
+            JsonNode questionsNode = root.get("questions");
 
-            int startIndex = text.indexOf('{');
-            int endIndex = text.lastIndexOf('}') + 1;
+            if (questionsNode != null && questionsNode.isArray()) {
+                for (JsonNode node : questionsNode) {
+                    QuizResponse dto = new QuizResponse();
+                    dto.setCategoryName(categoryName);
+                    dto.setQuestion(node.path("question").asText());
 
-            if (startIndex != -1 && endIndex != -1) {
-                String cleanJson = text.substring(startIndex, endIndex);
-                JsonNode root = objectMapper.readTree(cleanJson);
-                JsonNode questionsNode = root.get("questions");
-
-                if (questionsNode != null && questionsNode.isArray()) {
-                    for (JsonNode node : questionsNode) {
-                        QuizResponse dto = new QuizResponse();
-                        dto.setCategoryName(categoryName);
-                        dto.setQuestion(node.path("question").asText());
-
-                        String answer = node.path("answer").asText();
-                        if (answer.isEmpty()) {
-                            answer = node.path("correct_answer").asText();
-                        }
-                        dto.setAnswer(answer);
-
-                        JsonNode optionsNode = node.path("options");
-                        if (optionsNode.isArray()) {
-                            List<String> optionsList = new ArrayList<>();
-                            for (JsonNode opt : optionsNode) {
-                                optionsList.add(opt.asText());
-                            }
-                            dto.setOptions(objectMapper.writeValueAsString(optionsList));
-                        }
-
-                        dto.setDifficultyLevel(1);
-                        responses.add(dto);
+                    String answer = node.path("answer").asText();
+                    if (answer.isEmpty()) {
+                        answer = node.path("correct_answer").asText();
                     }
+                    dto.setAnswer(answer);
+
+                    JsonNode optionsNode = node.path("options");
+                    if (optionsNode.isArray()) {
+                        List<String> optionsList = new ArrayList<>();
+                        for (JsonNode opt : optionsNode) {
+                            optionsList.add(opt.asText());
+                        }
+                        dto.setOptions(objectMapper.writeValueAsString(optionsList));
+                    }
+
+                    dto.setDifficultyLevel(1);
+                    responses.add(dto);
                 }
             }
         } catch (Exception e) {

@@ -51,7 +51,7 @@ public class JokeService {
 
         // 2. If none, generate new jokes via Gemini
         logger.info("No unseen jokes for user {}, generating more...", user.getId());
-        generateAndSaveJokes(5);
+        generateAndSaveJokes(10);
 
         // 3. Try fetching again
         return contentRepository.findRandomUnseen(user.getId()).orElse(null);
