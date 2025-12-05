@@ -44,8 +44,40 @@ public class GeminiService {
             if (responseText == null)
                 return List.of();
 
+            return parseContent(responseText, topicName, categoryName);
+
+        } catch (Exception e) {
+            logger.error("Error generating content", e);
+            return List.of();
+        }
+    }
+
+    public String generateContent(String topicName, int count) {
+        try {
+            String prompt = String.format(
+                    "Generate %d interesting, unique, and fun facts about %s. " +
+                            "Each fact should be concise (1-2 sentences) and include an emoji at the start. " +
+                            "Format the output as a JSON array of strings.",
+                    count, topicName);
+
+            return sendMessage(topicName, prompt);
+        } catch (Exception e) {
+            logger.error("Error generating content", e);
+            return null;
+        }
+    }
+
+    public List<ContentItemResponse> parseContent(String jsonText, String topicName) {
+        return parseContent(jsonText, topicName, "General");
+    }
+
+    public List<ContentItemResponse> parseContent(String jsonText, String topicName, String categoryName) {
+        try {
+            if (jsonText == null)
+                return List.of();
+
             // Clean markdown before parsing
-            String cleanText = responseText.trim();
+            String cleanText = jsonText.trim();
             if (cleanText.startsWith("```json"))
                 cleanText = cleanText.substring(7);
             if (cleanText.startsWith("```"))
@@ -82,9 +114,8 @@ public class GeminiService {
                 }
             }
             return results;
-
         } catch (Exception e) {
-            logger.error("Error generating content", e);
+            logger.error("Error parsing content", e);
             return List.of();
         }
     }

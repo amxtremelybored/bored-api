@@ -21,4 +21,6 @@ public interface TopicRepository extends JpaRepository<Topic, Long> {
 
     @Query(value = "SELECT t.* FROM topics t JOIN topic_contents tc ON t.id = tc.topic_id WHERE t.is_content_loaded = true ORDER BY RANDOM() LIMIT 1", nativeQuery = true)
     Topic findRandomTopicWithContent();
+
+    List<Topic> findByNameContainingIgnoreCase(String name);
 }

@@ -63,8 +63,19 @@ public class DoYouKnowService {
             return;
 
         try {
-            UserDoYouKnowView view = new UserDoYouKnowView(user.getId(), contentId, isLiked);
-            userViewRepository.save(view);
+            Optional<UserDoYouKnowView> existingView = userViewRepository
+                    .findByUserProfileIdAndDoYouKnowContentId(user.getId(), contentId);
+
+            if (existingView.isPresent()) {
+                UserDoYouKnowView view = existingView.get();
+                if (isLiked != null) {
+                    view.setIsLiked(isLiked);
+                    userViewRepository.save(view);
+                }
+            } else {
+                UserDoYouKnowView view = new UserDoYouKnowView(user.getId(), contentId, isLiked);
+                userViewRepository.save(view);
+            }
         } catch (Exception e) {
             logger.warn("Failed to mark fact {} as viewed for user {}: {}", contentId, user.getId(), e.getMessage());
         }

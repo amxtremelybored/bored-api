@@ -26,24 +26,60 @@ public class TopicContent {
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
 
+    @Column(name = "source")
+    private String source;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = OffsetDateTime.now();
     }
 
     // getters/setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Long getId() {
+        return id;
+    }
 
-    public Topic getTopic() { return topic; }
-    public void setTopic(Topic topic) { this.topic = topic; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public Integer getContentIndex() { return contentIndex; }
-    public void setContentIndex(Integer contentIndex) { this.contentIndex = contentIndex; }
+    public Topic getTopic() {
+        return topic;
+    }
 
-    public String getContent() { return content; }
-    public void setContent(String content) { this.content = content; }
+    public void setTopic(Topic topic) {
+        this.topic = topic;
+    }
 
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+    public Integer getContentIndex() {
+        return contentIndex;
+    }
+
+    public void setContentIndex(Integer contentIndex) {
+        this.contentIndex = contentIndex;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(OffsetDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
 }

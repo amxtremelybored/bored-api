@@ -135,4 +135,12 @@ public class ContentFeedController {
                 TopicSummary summary = contentFeedService.getNextTopicForGuest(guestUid, seenTopicIds);
                 return ResponseEntity.ok(summary);
         }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<ContentItemResponse>> searchContent(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "10") int size) {
+        List<ContentItemResponse> results = contentFeedService.searchContent(query, size);
+        return ResponseEntity.ok(results);
+    }
 }
