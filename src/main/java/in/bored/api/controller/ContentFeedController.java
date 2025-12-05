@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @RestController
 @RequestMapping("/api/content")
@@ -136,11 +138,21 @@ public class ContentFeedController {
                 return ResponseEntity.ok(summary);
         }
 
-    @GetMapping("/search")
-    public ResponseEntity<List<ContentItemResponse>> searchContent(
-            @RequestParam String query,
-            @RequestParam(defaultValue = "10") int size) {
-        List<ContentItemResponse> results = contentFeedService.searchContent(query, size);
-        return ResponseEntity.ok(results);
-    }
+        @GetMapping("/search")
+        public ResponseEntity<List<ContentItemResponse>> searchContent(
+                        @RequestParam String query,
+                        @RequestParam(defaultValue = "10") int size) {
+
+                String guestUid = null;
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+                        // Can be authenticated User or Guest with valid Firebase UID
+                        if (auth.getPrincipal() instanceof String) {
+                                guestUid = (String) auth.getPrincipal();
+                        }
+                }
+
+                List<ContentItemResponse> results = contentFeedService.searchContent(query, size, guestUid);
+                return ResponseEntity.ok(results);
+        }
 }

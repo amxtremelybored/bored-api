@@ -20,6 +20,8 @@ import in.bored.api.repo.TopicRepository;
 import in.bored.api.repo.UserContentViewRepository;
 import in.bored.api.repo.UserPreferenceRepository;
 import in.bored.api.repo.UserProfileRepository;
+import in.bored.api.repo.UserSearchLogRepository; // New Import
+import in.bored.api.model.UserSearchLog; // New Import
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -44,6 +46,7 @@ public class ContentFeedService {
     private final UserContentViewRepository userContentViewRepository;
     private final ContentCategoryRepository contentCategoryRepository;
     private final GeminiService geminiService;
+    private final UserSearchLogRepository userSearchLogRepository; // New Field
 
     public ContentFeedService(TopicContentRepository topicContentRepository,
             TopicRepository topicRepository,
@@ -51,7 +54,8 @@ public class ContentFeedService {
             UserPreferenceRepository userPreferenceRepository,
             UserContentViewRepository userContentViewRepository,
             ContentCategoryRepository contentCategoryRepository,
-            GeminiService geminiService) {
+            GeminiService geminiService,
+            UserSearchLogRepository userSearchLogRepository) {
         this.topicContentRepository = topicContentRepository;
         this.topicRepository = topicRepository;
         this.userProfileRepository = userProfileRepository;
@@ -59,6 +63,7 @@ public class ContentFeedService {
         this.userContentViewRepository = userContentViewRepository;
         this.contentCategoryRepository = contentCategoryRepository;
         this.geminiService = geminiService;
+        this.userSearchLogRepository = userSearchLogRepository;
     }
 
     // ---------------------------------------------------------
@@ -703,7 +708,7 @@ public class ContentFeedService {
     // ---------------------------------------------------------
     // 4) SEARCH (Unified: DB -> Gemini)
     // ---------------------------------------------------------
-    public List<ContentItemResponse> searchContent(String query, int size) {
+    public List<ContentItemResponse> searchContent(String query, int size, String guestUid) {
         if (query == null || query.trim().isEmpty()) {
             return Collections.emptyList();
         }
@@ -711,37 +716,48 @@ public class ContentFeedService {
         String trimmedQuery = query.trim();
 
         // 1. Try to find a matching topic in DB
-        List<Topic> matchingTopics = topicRepository.findByNameContainingIgnoreCase(trimmedQuery);
-
-        Topic selectedTopic = null;
-        if (!matchingTopics.isEmpty()) {
-            // Pick the best match (e.g., exact match or first one)
-            // For now, just pick the first one that has content loaded
-            for (Topic t : matchingTopics) {
-                if (t.isContentLoaded()) {
-                    selectedTopic = t;
-                    break;
-                }
-            }
-
-            // If we found a topic but it has no content, we might want to generate content
-            // for it
-            if (selectedTopic == null) {
-                selectedTopic = matchingTopics.get(0);
-            }
+        if (trimmedQuery.isEmpty()) {
+            return Collections.emptyList();
         }
 
-        // 2. If we have a topic, try to fetch content from DB
-        if (selectedTopic != null && selectedTopic.isContentLoaded()) {
-            // Fetch random content for this topic
-            // We can reuse fetchNextForCurrentUser logic but constrained to this topic
-            // Or just fetch random content for this topic
-            // For simplicity, let's just fetch random content for this topic
-            // Note: This doesn't track "unseen" strictly for search, but that's usually
-            // fine for search results
-            List<TopicContent> contents = topicContentRepository.findRandomByTopicIn(
-                    Collections.singletonList(selectedTopic),
-                    PageRequest.of(0, size));
+        // Resolve UserProfile if authenticated
+        UserProfile user = null;
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+                user = getCurrentUserProfile();
+            }
+        } catch (Exception e) {
+            // Ignore auth errors, treat as guest
+        }
+
+        // 📝 Log the search
+        try {
+            UserSearchLog log = new UserSearchLog();
+            log.setSearchQuery(trimmedQuery);
+            log.setUserProfile(user);
+            log.setGuestUid(guestUid);
+            userSearchLogRepository.save(log);
+        } catch (Exception e) {
+            logger.error("Failed to log search query", e);
+        }
+
+        // 1. Search locally in Topics
+        // Try strict match first, then containing
+        List<Topic> matchingTopics = topicRepository.findByNameContainingIgnoreCase(trimmedQuery);
+        Topic selectedTopic = null;
+
+        if (!matchingTopics.isEmpty()) {
+            selectedTopic = matchingTopics.get(0);
+        }
+
+        // 2. If we found a topic, check if it has content
+        if (selectedTopic != null) {
+            // Check if we have enough content? Or just return what we have?
+            // Let's rely on random fetch.
+            Pageable pageable = PageRequest.of(0, size);
+            List<TopicContent> contents = topicContentRepository
+                    .findRandomByTopicIn(Collections.singletonList(selectedTopic), pageable);
 
             if (!contents.isEmpty()) {
                 return contents.stream().map(this::mapToResponse).toList();
@@ -749,57 +765,20 @@ public class ContentFeedService {
         }
 
         // 3. Fallback: Gemini
-        // If no topic found, or topic found but no content, or DB fetch returned empty
-        // We generate content using Gemini
-
-        // If we found a topic but it had no content, use that topic. Otherwise create a
-        // new one (or just use the string)
-        // For now, let's just use the query string to generate content
-
         try {
             String generatedJson = geminiService.generateContent(trimmedQuery, size);
 
-            // We need to parse this and save it if we want to persist it
-            // But for search, maybe we just return it directly?
-            // The user requirement implies "backend calls Gemini, saves the new facts, and
-            // returns them"
-
-            // To save, we need a Topic.
             if (selectedTopic == null) {
-                // Check if topic exists by exact name to avoid duplicates
-                // (findByNameContainingIgnoreCase might have returned partial matches, but we
-                // want exact for creation)
-                // For simplicity, let's just create a new topic if we didn't find a good one
-                Topic newTopic = new Topic();
-                newTopic.setName(trimmedQuery); // Capitalize?
-                newTopic.setDisplayName(trimmedQuery); // Capitalize?
-                newTopic.setContentLoaded(true); // We are about to load it
-                // We need a category... maybe "General" or "Search"?
-                // Or try to classify it?
-                // For now, let's assign to a default category or just leave it null if allowed
-                // (it might not be)
-                // Let's pick the first category available or a "General" one if exists.
-                // This is tricky without a "Search" category.
-                // Let's just NOT save for now to avoid polluting DB with bad topics,
-                // UNLESS we can confidently map it.
-
-                // WAIT, the prompt says "saves the new facts".
-                // Let's try to save it to a "Search" category if possible, or just return
-                // transient content.
-                // Given the complexity of categorizing on the fly, let's return transient
-                // content for now
-                // and maybe save it to a "Temporary" topic if we really need to.
-
-                // Actually, let's just return the content without saving for this iteration
-                // to ensure we don't break the DB constraints.
-                // We can parse the JSON to ContentItemResponse.
-
+                // If DB didn't find a topic, just return parsed content without saving (as per
+                // previous fix discussion)
+                // OR create a new topic if desired. For now, sticking to previous transient
+                // behavior
+                // unless we want to auto-create topics from search (which can pollute DB).
                 return geminiService.parseContent(generatedJson, trimmedQuery);
             } else {
-                // We have a topic, we can save the new content to it!
+                // We have a topic, update it with new content
                 List<ContentItemResponse> newItems = geminiService.parseContent(generatedJson, selectedTopic.getName());
 
-                // Calculate next content index
                 Integer maxIndex = topicContentRepository.findMaxContentIndexByTopic(selectedTopic);
                 int nextIndex = (maxIndex == null) ? 0 : maxIndex + 1;
 
