@@ -23,4 +23,6 @@ public interface TopicRepository extends JpaRepository<Topic, Long> {
     Topic findRandomTopicWithContent();
 
     List<Topic> findByNameContainingIgnoreCase(String name);
+
+    List<Topic> findByCategory(ContentCategory category);
 }

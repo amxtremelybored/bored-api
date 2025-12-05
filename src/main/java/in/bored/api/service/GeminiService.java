@@ -35,10 +35,16 @@ public class GeminiService {
     public List<ContentItemResponse> generateContent(String topicName, String categoryName, int count) {
         try {
             String prompt = String.format(
-                    "Generate %d interesting, unique, and fun facts about %s (Category: %s). " +
-                            "Each fact should be concise (1-2 sentences) and include an emoji at the start. " +
-                            "Format the output as a JSON array of strings.",
-                    count, topicName, categoryName);
+                    "Provide exactly %d diverse, fun, and interesting facts about %s. " +
+                            "IMPORTANT: Start each fact with '### Fact X:' followed directly by an emoji and then the content. "
+                            +
+                            "Each fact should be concise (1-3 sentences), engaging, and include at least one emoji. " +
+                            "Use markdown formatting with bullets and short paragraphs. " +
+                            "DO NOT include any introductory text or header. " +
+                            "DO NOT say 'Here are 10 facts about...' - just start with the first fact immediately. " +
+                            "Format example: '### Fact 1: 🎭 Shakespeare wrote 37 plays...' " +
+                            "Make all facts unique, interesting, and visually appealing with emojis.",
+                    count, topicName);
 
             String responseText = sendMessage(topicName, prompt);
             if (responseText == null)
@@ -72,37 +78,68 @@ public class GeminiService {
     }
 
     public List<ContentItemResponse> parseContent(String jsonText, String topicName, String categoryName) {
-        try {
-            if (jsonText == null)
-                return List.of();
-
-            String cleanText = cleanJson(jsonText);
-            // Parse JSON array of strings
-            JsonNode root = objectMapper.readTree(cleanText);
-            List<ContentItemResponse> results = new ArrayList<>();
-
-            // Handle if response is wrapped in markdown code block (double check)
-            if (root.isTextual()) {
-                String text = root.asText();
-                String innerClean = cleanJson(text);
-                root = objectMapper.readTree(innerClean);
-            }
-
-            if (root.isArray()) {
-                for (JsonNode node : root) {
-                    ContentItemResponse item = new ContentItemResponse();
-                    item.setContent(node.asText());
-                    item.setTopicName(topicName);
-                    item.setCategoryName(categoryName);
-                    item.setSource("Gemini");
-                    results.add(item);
-                }
-            }
-            return results;
-        } catch (Exception e) {
-            logger.error("Error parsing content", e);
+        if (jsonText == null || jsonText.trim().isEmpty()) {
             return List.of();
         }
+
+        List<ContentItemResponse> results = new ArrayList<>();
+
+        // 1. Try to parse as JSON first (backward compatibility or if Gemini decides to
+        // wrap in JSON)
+        try {
+            String cleanText = cleanJson(jsonText);
+            if (!cleanText.isEmpty()) {
+                JsonNode root = objectMapper.readTree(cleanText);
+
+                if (root.isTextual()) {
+                    // Handle double-encoded JSON if happens
+                    String inner = root.asText();
+                    try {
+                        root = objectMapper.readTree(cleanJson(inner));
+                    } catch (Exception ignored) {
+                    }
+                }
+
+                if (root.isArray()) {
+                    for (JsonNode node : root) {
+                        ContentItemResponse item = new ContentItemResponse();
+                        item.setContent(node.asText());
+                        item.setTopicName(topicName);
+                        item.setCategoryName(categoryName);
+                        item.setSource("Gemini");
+                        results.add(item);
+                    }
+                    return results;
+                }
+            }
+        } catch (Exception e) {
+            // Not JSON, ignore and fall through to text parsing
+            logger.debug("Content is not JSON, trying text parsing. Error: {}", e.getMessage());
+        }
+
+        // 2. Parse as custom Markdown Text (### Fact X:)
+        // Regex to split by "### Fact <number>:" or just "Fact <number>:"
+        String[] parts = jsonText.split("###\\s*Fact\\s*\\d+:|Fact\\s*\\d+:");
+
+        for (String part : parts) {
+            String cleanPart = part.trim();
+            // Filter out empty parts or intro text
+            if (!cleanPart.isEmpty() && cleanPart.length() > 10) {
+                // Double check it's not just "Here are facts"
+                if (cleanPart.toLowerCase().startsWith("here are") || cleanPart.toLowerCase().startsWith("sure,")) {
+                    continue;
+                }
+
+                ContentItemResponse item = new ContentItemResponse();
+                item.setContent(cleanPart);
+                item.setTopicName(topicName);
+                item.setCategoryName(categoryName);
+                item.setSource("Gemini");
+                results.add(item);
+            }
+        }
+
+        return results;
     }
 
     private String cleanJson(String text) {
