@@ -768,6 +768,11 @@ public class ContentFeedService {
                 item.setSource("Gemini (Direct)");
                 item.setTopicName(trimmedQuery);
                 item.setTopicDisplayName("Search: " + trimmedQuery);
+
+                // Fix for Flutter Null check on createdAt
+                if (item.getCreatedAt() == null) {
+                    item.setCreatedAt(java.time.OffsetDateTime.now());
+                }
             }
 
             return generatedItems;
