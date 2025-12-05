@@ -11,7 +11,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class FunService {
@@ -36,25 +35,28 @@ public class FunService {
         this.geminiService = geminiService;
     }
 
-    public FunContent getNextFunForCurrentUser() {
+    public List<FunContent> getNextFunForCurrentUser(int count) {
         UserProfile user = getCurrentUserProfile();
         if (user == null) {
             logger.warn("No authenticated user found for fun fetch.");
-            return null;
+            return List.of();
         }
 
-        // 1. Try to find an unseen fun item in DB
-        Optional<FunContent> existing = contentRepository.findRandomUnseen(user.getId());
-        if (existing.isPresent()) {
-            return existing.get();
+        // 1. Try to find unseen fun items in DB
+        List<FunContent> existing = contentRepository.findRandomUnseen(user.getId(), count);
+        if (existing.size() >= count) {
+            return existing;
         }
 
-        // 2. If none, generate new fun items via Gemini
-        logger.info("No unseen fun content for user {}, generating more...", user.getId());
+        // 2. If not enough, generate new fun items via Gemini
+        // Calculate how many more we need, but maybe just generate a batch of 10 anyway
+        // to be safe/efficient
+        logger.info("Not enough unseen fun content for user {} (found {}), generating more...", user.getId(),
+                existing.size());
         generateAndSaveFun(10);
 
         // 3. Try fetching again
-        return contentRepository.findRandomUnseen(user.getId()).orElse(null);
+        return contentRepository.findRandomUnseen(user.getId(), count);
     }
 
     public void markFunAsViewed(Long funId, Boolean isLiked) {

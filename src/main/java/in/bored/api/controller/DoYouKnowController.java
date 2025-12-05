@@ -5,6 +5,7 @@ import in.bored.api.service.DoYouKnowService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -18,9 +19,9 @@ public class DoYouKnowController {
     }
 
     @GetMapping("/next")
-    public ResponseEntity<DoYouKnowContent> getNextFact() {
-        DoYouKnowContent content = service.getNextDoYouKnowForCurrentUser();
-        if (content == null) {
+    public ResponseEntity<List<DoYouKnowContent>> getNextFact(@RequestParam(defaultValue = "10") int size) {
+        List<DoYouKnowContent> content = service.getNextDoYouKnowForCurrentUser(size);
+        if (content.isEmpty()) {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.ok(content);

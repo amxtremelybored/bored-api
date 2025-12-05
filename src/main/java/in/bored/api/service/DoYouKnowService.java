@@ -36,25 +36,26 @@ public class DoYouKnowService {
         this.geminiService = geminiService;
     }
 
-    public DoYouKnowContent getNextDoYouKnowForCurrentUser() {
+    public List<DoYouKnowContent> getNextDoYouKnowForCurrentUser(int count) {
         UserProfile user = getCurrentUserProfile();
         if (user == null) {
             logger.warn("No authenticated user found for do you know fetch.");
-            return null;
+            return List.of();
         }
 
-        // 1. Try to find an unseen fact in DB
-        Optional<DoYouKnowContent> existing = contentRepository.findRandomUnseen(user.getId());
-        if (existing.isPresent()) {
-            return existing.get();
+        // 1. Try to find unseen facts in DB
+        List<DoYouKnowContent> existing = contentRepository.findRandomUnseen(user.getId(), count);
+        if (existing.size() >= count) {
+            return existing;
         }
 
-        // 2. If none, generate new facts via Gemini
-        logger.info("No unseen facts for user {}, generating more...", user.getId());
+        // 2. If not enough, generate new facts via Gemini
+        logger.info("Not enough unseen facts for user {} (found {}), generating more...", user.getId(),
+                existing.size());
         generateAndSaveDoYouKnow(10);
 
         // 3. Try fetching again
-        return contentRepository.findRandomUnseen(user.getId()).orElse(null);
+        return contentRepository.findRandomUnseen(user.getId(), count);
     }
 
     public void markDoYouKnowAsViewed(Long contentId, Boolean isLiked) {

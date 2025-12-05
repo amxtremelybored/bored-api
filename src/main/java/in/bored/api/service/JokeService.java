@@ -11,7 +11,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class JokeService {
@@ -36,25 +35,26 @@ public class JokeService {
         this.geminiService = geminiService;
     }
 
-    public JokeContent getNextJokeForCurrentUser() {
+    public List<JokeContent> getNextJokeForCurrentUser(int count) {
         UserProfile user = getCurrentUserProfile();
         if (user == null) {
             logger.warn("No authenticated user found for joke fetch.");
-            return null;
+            return List.of();
         }
 
-        // 1. Try to find an unseen joke in DB
-        Optional<JokeContent> existing = contentRepository.findRandomUnseen(user.getId());
-        if (existing.isPresent()) {
-            return existing.get();
+        // 1. Try to find unseen jokes in DB
+        List<JokeContent> existing = contentRepository.findRandomUnseen(user.getId(), count);
+        if (existing.size() >= count) {
+            return existing;
         }
 
-        // 2. If none, generate new jokes via Gemini
-        logger.info("No unseen jokes for user {}, generating more...", user.getId());
+        // 2. If not enough, generate new jokes via Gemini
+        logger.info("Not enough unseen jokes for user {} (found {}), generating more...", user.getId(),
+                existing.size());
         generateAndSaveJokes(10);
 
         // 3. Try fetching again
-        return contentRepository.findRandomUnseen(user.getId()).orElse(null);
+        return contentRepository.findRandomUnseen(user.getId(), count);
     }
 
     public void markJokeAsViewed(Long jokeId, Boolean isLiked) {

@@ -5,6 +5,7 @@ import in.bored.api.service.FunService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -18,9 +19,9 @@ public class FunController {
     }
 
     @GetMapping("/next")
-    public ResponseEntity<FunContent> getNextFun() {
-        FunContent fun = funService.getNextFunForCurrentUser();
-        if (fun == null) {
+    public ResponseEntity<List<FunContent>> getNextFun(@RequestParam(defaultValue = "10") int size) {
+        List<FunContent> fun = funService.getNextFunForCurrentUser(size);
+        if (fun.isEmpty()) {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.ok(fun);

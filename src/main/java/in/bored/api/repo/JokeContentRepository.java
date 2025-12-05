@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
+import java.util.List;
 
 @Repository
 public interface JokeContentRepository extends JpaRepository<JokeContent, Long> {
@@ -15,7 +15,7 @@ public interface JokeContentRepository extends JpaRepository<JokeContent, Long> 
                 LEFT JOIN user_joke_view ujv ON jc.id = ujv.joke_content_id AND ujv.user_profile_id = :userId
                 WHERE ujv.id IS NULL
                 ORDER BY RANDOM()
-                LIMIT 1
+                LIMIT :limit
             """, nativeQuery = true)
-    Optional<JokeContent> findRandomUnseen(@Param("userId") Long userId);
+    List<JokeContent> findRandomUnseen(@Param("userId") Long userId, @Param("limit") int limit);
 }

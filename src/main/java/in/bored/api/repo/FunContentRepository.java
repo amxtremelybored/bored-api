@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
+import java.util.List;
 
 @Repository
 public interface FunContentRepository extends JpaRepository<FunContent, Long> {
@@ -15,7 +15,7 @@ public interface FunContentRepository extends JpaRepository<FunContent, Long> {
                 LEFT JOIN user_fun_view ufv ON fc.id = ufv.fun_content_id AND ufv.user_profile_id = :userId
                 WHERE ufv.id IS NULL
                 ORDER BY RANDOM()
-                LIMIT 1
+                LIMIT :limit
             """, nativeQuery = true)
-    Optional<FunContent> findRandomUnseen(@Param("userId") Long userId);
+    List<FunContent> findRandomUnseen(@Param("userId") Long userId, @Param("limit") int limit);
 }
