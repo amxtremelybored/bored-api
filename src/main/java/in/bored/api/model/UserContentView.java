@@ -36,6 +36,9 @@ public class UserContentView {
     @Column(name = "viewed_at", updatable = false)
     private OffsetDateTime viewedAt;
 
+    @Column(name = "saved")
+    private boolean saved = false;
+
     @PrePersist
     public void prePersist() {
         this.viewedAt = OffsetDateTime.now();
@@ -88,5 +91,13 @@ public class UserContentView {
 
     public void setViewedAt(OffsetDateTime viewedAt) {
         this.viewedAt = viewedAt;
+    }
+
+    public boolean isSaved() {
+        return saved;
+    }
+
+    public void setSaved(boolean saved) {
+        this.saved = saved;
     }
 }

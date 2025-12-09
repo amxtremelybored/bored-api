@@ -15,6 +15,7 @@ public class ContentItemResponse {
     private String source;
     private String categoryName;
     private String topicDisplayName;
+    private boolean saved;
 
     // getters/setters
     public Long getId() {
@@ -95,5 +96,13 @@ public class ContentItemResponse {
 
     public void setTopicDisplayName(String topicDisplayName) {
         this.topicDisplayName = topicDisplayName;
+    }
+
+    public boolean isSaved() {
+        return saved;
+    }
+
+    public void setSaved(boolean saved) {
+        this.saved = saved;
     }
 }

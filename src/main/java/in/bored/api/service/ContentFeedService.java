@@ -30,7 +30,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -794,6 +793,69 @@ public class ContentFeedService {
         }
         resp.setSource(tc.getSource());
         resp.setCreatedAt(tc.getCreatedAt());
+        // Note: Saved status is context-dependent.
+        // For unified search/feed, we currently don't pre-populate 'saved' to avoid
+        // N+1.
+        // It defaults to false.
         return resp;
     }
+
+    // ---------------------------------------------------------
+    // 5) TOGGLE SAVE
+    // ---------------------------------------------------------
+    public ContentItemResponse toggleSave(Long contentId, boolean saved, String guestUid) {
+        // 1. Resolve User
+        UserProfile user = null;
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+                user = getCurrentUserProfile();
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+
+        // 2. Fetch Content
+        TopicContent content = topicContentRepository.findById(contentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Content not found: " + contentId));
+
+        UserContentView view;
+
+        if (user != null) {
+            // Authenticated
+            final UserProfile finalUser = user;
+            view = userContentViewRepository.findByUserProfileAndTopicContent_Id(finalUser, contentId)
+                    .orElseGet(() -> {
+                        UserContentView v = new UserContentView();
+                        v.setUserProfile(finalUser);
+                        v.setTopicContent(content);
+                        v.setTopic(content.getTopic());
+                        return v;
+                    });
+        } else if (guestUid != null && !guestUid.isEmpty()) {
+            // Guest
+            view = userContentViewRepository.findByGuestUidAndTopicContent_Id(guestUid, contentId)
+                    .orElseGet(() -> {
+                        UserContentView v = new UserContentView();
+                        v.setGuestUid(guestUid);
+                        v.setTopicContent(content);
+                        v.setTopic(content.getTopic());
+                        return v;
+                    });
+        } else {
+            throw new ResourceNotFoundException("User identification required");
+        }
+
+        view.setSaved(saved);
+        if (view.getViewedAt() == null) {
+            view.setViewedAt(java.time.OffsetDateTime.now());
+        }
+
+        UserContentView savedView = userContentViewRepository.save(view);
+
+        ContentItemResponse response = toResponse(content);
+        response.setSaved(savedView.isSaved());
+        return response;
+    }
+
 }
