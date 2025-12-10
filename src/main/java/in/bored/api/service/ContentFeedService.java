@@ -137,7 +137,7 @@ public class ContentFeedService {
         // 2) Size (default 5)
         int size = (request.getSize() != null && request.getSize() > 0)
                 ? request.getSize()
-                : 5;
+                : 10;
 
         Pageable pageable = PageRequest.of(0, size);
 
@@ -281,7 +281,7 @@ public class ContentFeedService {
 
         int size = (request != null && request.getSize() != null && request.getSize() > 0)
                 ? request.getSize()
-                : 5;
+                : 10;
 
         Pageable pageable = PageRequest.of(0, size);
 
