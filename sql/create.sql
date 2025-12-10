@@ -124,3 +124,21 @@ create table public.user_profiles
 alter table public.user_profiles
     owner to postgres;
 
+
+create table public.super_category
+(
+    id         uuid                     default gen_random_uuid() not null
+        primary key,
+    name       varchar(255)                                       not null
+        unique,
+    emoji      varchar(16),
+    created_at timestamp with time zone default now()             not null,
+    updated_at timestamp with time zone default now()             not null
+);
+
+alter table public.super_category
+    owner to postgres;
+
+alter table public.content_category
+    add column parent_id uuid
+        references public.super_category;
