@@ -1,4 +1,3 @@
-// src/main/java/in/bored/api/model/ContentCategory.java
 package in.bored.api.model;
 
 import jakarta.persistence.*;
@@ -9,8 +8,8 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "content_category")
-public class ContentCategory {
+@Table(name = "super_category")
+public class SuperCategory {
 
     @Id
     @GeneratedValue
@@ -23,12 +22,6 @@ public class ContentCategory {
     @Column(name = "emoji", length = 16)
     private String emoji;
 
-    @Column(name = "is_content_loaded", nullable = false)
-    private boolean contentLoaded = false;
-
-    @Column(name = "content_loaded_at")
-    private OffsetDateTime contentLoadedAt;
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -37,30 +30,17 @@ public class ContentCategory {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_id")
-    private SuperCategory superCategory;
-
-    public ContentCategory() {
+    public SuperCategory() {
     }
 
-    public ContentCategory(UUID id,
-            String name,
-            String emoji,
-            boolean contentLoaded,
-            OffsetDateTime contentLoadedAt,
-            OffsetDateTime createdAt,
-            OffsetDateTime updatedAt) {
+    public SuperCategory(UUID id, String name, String emoji, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
         this.id = id;
         this.name = name;
         this.emoji = emoji;
-        this.contentLoaded = contentLoaded;
-        this.contentLoadedAt = contentLoadedAt;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
 
-    // getters/setters
     public UUID getId() {
         return id;
     }
@@ -85,22 +65,6 @@ public class ContentCategory {
         this.emoji = emoji;
     }
 
-    public boolean isContentLoaded() {
-        return contentLoaded;
-    }
-
-    public void setContentLoaded(boolean contentLoaded) {
-        this.contentLoaded = contentLoaded;
-    }
-
-    public OffsetDateTime getContentLoadedAt() {
-        return contentLoadedAt;
-    }
-
-    public void setContentLoadedAt(OffsetDateTime contentLoadedAt) {
-        this.contentLoadedAt = contentLoadedAt;
-    }
-
     public OffsetDateTime getCreatedAt() {
         return createdAt;
     }
@@ -115,13 +79,5 @@ public class ContentCategory {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
-    }
-
-    public SuperCategory getSuperCategory() {
-        return superCategory;
-    }
-
-    public void setSuperCategory(SuperCategory superCategory) {
-        this.superCategory = superCategory;
     }
 }
