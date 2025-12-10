@@ -1,4 +1,3 @@
-// src/main/java/in/bored/api/service/ContentFeedService.java
 package in.bored.api.service;
 
 import in.bored.api.dto.ContentCategorySummary;
@@ -14,24 +13,30 @@ import in.bored.api.model.TopicContent;
 import in.bored.api.model.UserContentView;
 import in.bored.api.model.UserPreference;
 import in.bored.api.model.UserProfile;
+import in.bored.api.model.UserSearchLog;
+import in.bored.api.model.UserTopicBookmark;
 import in.bored.api.repo.ContentCategoryRepository;
 import in.bored.api.repo.TopicContentRepository;
 import in.bored.api.repo.TopicRepository;
 import in.bored.api.repo.UserContentViewRepository;
 import in.bored.api.repo.UserPreferenceRepository;
 import in.bored.api.repo.UserProfileRepository;
-import in.bored.api.repo.UserSearchLogRepository; // New Import
-import in.bored.api.model.UserSearchLog; // New Import
+import in.bored.api.repo.UserSearchLogRepository;
+import in.bored.api.repo.UserTopicBookmarkRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class ContentFeedService {
@@ -45,7 +50,8 @@ public class ContentFeedService {
     private final UserContentViewRepository userContentViewRepository;
     private final ContentCategoryRepository contentCategoryRepository;
     private final GeminiService geminiService;
-    private final UserSearchLogRepository userSearchLogRepository; // New Field
+    private final UserSearchLogRepository userSearchLogRepository;
+    private final UserTopicBookmarkRepository userTopicBookmarkRepository;
 
     public ContentFeedService(TopicContentRepository topicContentRepository,
             TopicRepository topicRepository,
@@ -54,7 +60,8 @@ public class ContentFeedService {
             UserContentViewRepository userContentViewRepository,
             ContentCategoryRepository contentCategoryRepository,
             GeminiService geminiService,
-            UserSearchLogRepository userSearchLogRepository) {
+            UserSearchLogRepository userSearchLogRepository,
+            UserTopicBookmarkRepository userTopicBookmarkRepository) {
         this.topicContentRepository = topicContentRepository;
         this.topicRepository = topicRepository;
         this.userProfileRepository = userProfileRepository;
@@ -63,6 +70,7 @@ public class ContentFeedService {
         this.contentCategoryRepository = contentCategoryRepository;
         this.geminiService = geminiService;
         this.userSearchLogRepository = userSearchLogRepository;
+        this.userTopicBookmarkRepository = userTopicBookmarkRepository;
     }
 
     // ---------------------------------------------------------
@@ -111,7 +119,6 @@ public class ContentFeedService {
 
         } else {
             // Normal flow: STRICTLY stick to requested topics.
-            // "topicIds is must all logic shpuld be based on that"
             if (request.getTopicIds() == null || request.getTopicIds().isEmpty()) {
                 logger.warn(
                         "⚠️ fetchNextForCurrentUser: topicIds missing in request. Returning empty list (no fallback to prefs).");
@@ -187,13 +194,16 @@ public class ContentFeedService {
                 userContentViewRepository.saveAll(newViews);
 
                 // Return mapped response
-                return savedContents.stream()
+                List<ContentItemResponse> response = savedContents.stream()
                         .map(c -> {
                             ContentItemResponse dto = this.toResponse(c);
                             dto.setSource("Gemini");
                             return dto;
                         })
                         .toList();
+
+                enrichContentItems(response, profile, null);
+                return response;
             }
             return Collections.emptyList();
         }
@@ -212,9 +222,12 @@ public class ContentFeedService {
         userContentViewRepository.saveAll(views);
 
         // 5) Map DTOs
-        return contents.stream()
+        List<ContentItemResponse> response = contents.stream()
                 .map(this::toResponse)
                 .toList();
+
+        enrichContentItems(response, profile, null);
+        return response;
     }
 
     // ---------------------------------------------------------
@@ -273,13 +286,13 @@ public class ContentFeedService {
                         tc.setTopic(randomTopic);
                         tc.setContent(item.getContent());
                         tc.setContentIndex(nextIndex++);
-                        tc.setCreatedAt(java.time.OffsetDateTime.now());
+                        tc.setCreatedAt(OffsetDateTime.now());
                         newContents.add(tc);
                     }
                     List<TopicContent> savedContents = topicContentRepository.saveAll(newContents);
 
                     // Update flags for Topic and Category
-                    java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
+                    OffsetDateTime now = OffsetDateTime.now();
 
                     randomTopic.setContentLoaded(true);
                     randomTopic.setContentLoadedAt(now);
@@ -306,13 +319,16 @@ public class ContentFeedService {
                         userContentViewRepository.saveAll(views);
                     }
 
-                    return savedContents.stream()
+                    List<ContentItemResponse> response = savedContents.stream()
                             .map(tc -> {
                                 ContentItemResponse resp = toResponse(tc);
                                 resp.setSource("Gemini");
                                 return resp;
                             })
                             .toList();
+
+                    enrichContentItems(response, null, request != null ? request.getGuestUid() : null);
+                    return response;
                 }
                 return Collections.emptyList();
             }
@@ -332,9 +348,12 @@ public class ContentFeedService {
                 userContentViewRepository.saveAll(views);
             }
 
-            return contents.stream()
+            List<ContentItemResponse> response = contents.stream()
                     .map(this::toResponse)
                     .toList();
+
+            enrichContentItems(response, null, request != null ? request.getGuestUid() : null);
+            return response;
         }
 
         // 2. STICKY LOAD (has topicIds and NOT refreshing): Stick to provided topics
@@ -372,13 +391,13 @@ public class ContentFeedService {
                     tc.setTopic(targetTopic);
                     tc.setContent(item.getContent());
                     tc.setContentIndex(nextIndex++);
-                    tc.setCreatedAt(java.time.OffsetDateTime.now());
+                    tc.setCreatedAt(OffsetDateTime.now());
                     newContents.add(tc);
                 }
                 List<TopicContent> savedContents = topicContentRepository.saveAll(newContents);
 
                 // Update flags
-                java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
+                OffsetDateTime now = OffsetDateTime.now();
                 targetTopic.setContentLoaded(true);
                 targetTopic.setContentLoadedAt(now);
                 topicRepository.save(targetTopic);
@@ -404,13 +423,16 @@ public class ContentFeedService {
                     userContentViewRepository.saveAll(views);
                 }
 
-                return savedContents.stream()
+                List<ContentItemResponse> response = savedContents.stream()
                         .map(tc -> {
                             ContentItemResponse resp = toResponse(tc);
                             resp.setSource("Gemini");
                             return resp;
                         })
                         .toList();
+
+                enrichContentItems(response, null, request != null ? request.getGuestUid() : null);
+                return response;
             }
         }
 
@@ -432,9 +454,12 @@ public class ContentFeedService {
             userContentViewRepository.saveAll(views);
         }
 
-        return contents.stream()
+        List<ContentItemResponse> response = contents.stream()
                 .map(this::toResponse)
                 .toList();
+
+        enrichContentItems(response, null, request != null ? request.getGuestUid() : null);
+        return response;
     }
 
     // ---------------------------------------------------------
@@ -484,6 +509,8 @@ public class ContentFeedService {
         response.setEmpty(true);
         response.setPreferredCategories(categorySummaries);
         response.setSuggestedTopics(topicSummaries);
+
+        enrichTopicSummaries(topicSummaries, profile, null);
 
         return response;
     }
@@ -601,6 +628,8 @@ public class ContentFeedService {
         summary.setEmoji(randomTopic.getEmoji());
         summary.setCategoryId(randomTopic.getCategory().getId());
 
+        enrichTopicSummary(summary, profile, null);
+
         return summary;
     }
 
@@ -661,6 +690,8 @@ public class ContentFeedService {
         summary.setName(randomTopic.getName());
         summary.setEmoji(randomTopic.getEmoji());
         summary.setCategoryId(randomTopic.getCategory().getId());
+
+        enrichTopicSummary(summary, null, guestUid);
 
         return summary;
     }
@@ -770,7 +801,7 @@ public class ContentFeedService {
 
                 // Fix for Flutter Null check on createdAt
                 if (item.getCreatedAt() == null) {
-                    item.setCreatedAt(java.time.OffsetDateTime.now());
+                    item.setCreatedAt(OffsetDateTime.now());
                 }
             }
 
@@ -848,7 +879,7 @@ public class ContentFeedService {
 
         view.setSaved(saved);
         if (view.getViewedAt() == null) {
-            view.setViewedAt(java.time.OffsetDateTime.now());
+            view.setViewedAt(OffsetDateTime.now());
         }
 
         UserContentView savedView = userContentViewRepository.save(view);
@@ -872,5 +903,175 @@ public class ContentFeedService {
             }
             return new java.util.ArrayList<>();
         }
+    }
+
+    // ---------------------------------------------------------
+    // 6) TOPIC BOOKMARKING
+    // ---------------------------------------------------------
+    public boolean toggleTopicBookmark(Long topicId, boolean bookmarked, String guestUid) {
+        Topic topic = topicRepository.findById(topicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Topic not found: " + topicId));
+
+        UserProfile user = null;
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+                user = getCurrentUserProfile();
+            }
+        } catch (Exception e) {
+            // Ignore for guests
+        }
+
+        if (user != null) {
+            // Logged-in user
+            Optional<UserTopicBookmark> existing = userTopicBookmarkRepository
+                    .findByUserProfileAndTopic(user, topic);
+            if (bookmarked) {
+                if (existing.isEmpty()) {
+                    UserTopicBookmark bookmark = new UserTopicBookmark();
+                    bookmark.setUserProfile(user);
+                    bookmark.setTopic(topic);
+                    userTopicBookmarkRepository.save(bookmark);
+                }
+                return true;
+            } else {
+                existing.ifPresent(userTopicBookmarkRepository::delete);
+                return false;
+            }
+        } else if (guestUid != null) {
+            // Guest user
+            Optional<UserTopicBookmark> existing = userTopicBookmarkRepository
+                    .findByGuestUidAndTopic(guestUid, topic);
+            if (bookmarked) {
+                if (existing.isEmpty()) {
+                    UserTopicBookmark bookmark = new UserTopicBookmark();
+                    bookmark.setGuestUid(guestUid);
+                    bookmark.setTopic(topic);
+                    userTopicBookmarkRepository.save(bookmark);
+                }
+                return true;
+            } else {
+                existing.ifPresent(userTopicBookmarkRepository::delete);
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    public List<ContentItemResponse> getBookmarkedContent(int size, String guestUid) {
+        UserProfile user = null;
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+                user = getCurrentUserProfile();
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+
+        List<Topic> bookmarkedTopics = Collections.emptyList();
+
+        if (user != null) {
+            bookmarkedTopics = userTopicBookmarkRepository.findByUserProfile(user)
+                    .stream()
+                    .map(UserTopicBookmark::getTopic)
+                    .toList();
+        } else if (guestUid != null) {
+            bookmarkedTopics = userTopicBookmarkRepository.findByGuestUid(guestUid)
+                    .stream()
+                    .map(UserTopicBookmark::getTopic)
+                    .toList();
+        }
+
+        if (bookmarkedTopics.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // Fetch unseen content from these topics
+        Pageable pageable = PageRequest.of(0, size);
+        List<TopicContent> contents;
+
+        if (user != null) {
+            contents = topicContentRepository.findNextUnseenForUser(user, bookmarkedTopics, pageable);
+        } else {
+            contents = topicContentRepository.findRandomUnseenForGuest(bookmarkedTopics, guestUid, pageable);
+        }
+
+        // If empty, fallback to random content from these topics
+        if (contents.isEmpty()) {
+            contents = topicContentRepository.findRandomByTopicIn(bookmarkedTopics, pageable);
+        }
+
+        List<ContentItemResponse> response = contents.stream()
+                .map(this::toResponse)
+                .toList();
+
+        enrichContentItems(response, user, guestUid);
+        return response;
+    }
+
+    // ---------------------------------------------------------
+    // 7) ENRICHMENT HELPERS
+    // ---------------------------------------------------------
+    private void enrichContentItems(List<ContentItemResponse> items, UserProfile user, String guestUid) {
+        if (items == null || items.isEmpty())
+            return;
+        if (user == null && guestUid == null)
+            return;
+
+        Set<Long> bookmarkedTopicIds = fetchBookmarkedTopicIds(user, guestUid);
+        if (bookmarkedTopicIds.isEmpty())
+            return;
+
+        for (ContentItemResponse item : items) {
+            if (bookmarkedTopicIds.contains(item.getTopicId())) {
+                item.setTopicBookmarked(true);
+            }
+        }
+    }
+
+    private void enrichTopicSummary(TopicSummary summary, UserProfile user, String guestUid) {
+        if (summary == null)
+            return;
+        if (user == null && guestUid == null)
+            return;
+
+        Set<Long> bookmarkedTopicIds = fetchBookmarkedTopicIds(user, guestUid);
+        if (bookmarkedTopicIds.contains(summary.getId())) {
+            summary.setBookmarked(true);
+        }
+    }
+
+    private void enrichTopicSummaries(List<TopicSummary> summaries, UserProfile user, String guestUid) {
+        if (summaries == null || summaries.isEmpty())
+            return;
+        if (user == null && guestUid == null)
+            return;
+
+        Set<Long> bookmarkedTopicIds = fetchBookmarkedTopicIds(user, guestUid);
+        if (bookmarkedTopicIds.isEmpty())
+            return;
+
+        for (TopicSummary summary : summaries) {
+            if (bookmarkedTopicIds.contains(summary.getId())) {
+                summary.setBookmarked(true);
+            }
+        }
+    }
+
+    private Set<Long> fetchBookmarkedTopicIds(UserProfile user, String guestUid) {
+        if (user != null) {
+            return userTopicBookmarkRepository.findByUserProfile(user)
+                    .stream()
+                    .map(b -> b.getTopic().getId())
+                    .collect(Collectors.toSet());
+        } else if (guestUid != null) {
+            return userTopicBookmarkRepository.findByGuestUid(guestUid)
+                    .stream()
+                    .map(b -> b.getTopic().getId())
+                    .collect(Collectors.toSet());
+        }
+        return Collections.emptySet();
     }
 }

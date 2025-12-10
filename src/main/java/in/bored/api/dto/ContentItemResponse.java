@@ -16,6 +16,7 @@ public class ContentItemResponse {
     private String categoryName;
     private String topicDisplayName;
     private boolean saved;
+    private boolean topicBookmarked; // New field
 
     // getters/setters
     public Long getId() {
@@ -104,5 +105,13 @@ public class ContentItemResponse {
 
     public void setSaved(boolean saved) {
         this.saved = saved;
+    }
+
+    public boolean isTopicBookmarked() {
+        return topicBookmarked;
+    }
+
+    public void setTopicBookmarked(boolean topicBookmarked) {
+        this.topicBookmarked = topicBookmarked;
     }
 }

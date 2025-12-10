@@ -5,10 +5,11 @@ import java.util.UUID;
 
 public class TopicSummary {
 
-    private Long id;          // topic id (matches Topic.id & ContentItemResponse.topicId)
+    private Long id; // topic id (matches Topic.id & ContentItemResponse.topicId)
     private String name;
     private String emoji;
-    private UUID categoryId;  // category id (matches ContentCategory.id)
+    private UUID categoryId; // category id (matches ContentCategory.id)
+    private boolean bookmarked; // New field
 
     public Long getId() {
         return id;
@@ -40,5 +41,13 @@ public class TopicSummary {
 
     public void setCategoryId(UUID categoryId) {
         this.categoryId = categoryId;
+    }
+
+    public boolean isBookmarked() {
+        return bookmarked;
+    }
+
+    public void setBookmarked(boolean bookmarked) {
+        this.bookmarked = bookmarked;
     }
 }

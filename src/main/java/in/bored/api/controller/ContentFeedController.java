@@ -190,4 +190,21 @@ public class ContentFeedController {
                 List<ContentItemResponse> items = contentFeedService.getSavedContent(size, guestUid);
                 return ResponseEntity.ok(items);
         }
+
+        @PostMapping("/topic/{id}/bookmark")
+        public ResponseEntity<Boolean> toggleTopicBookmark(
+                        @PathVariable Long id,
+                        @RequestParam boolean bookmarked) {
+
+                String guestUid = null;
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+                        if (auth.getPrincipal() instanceof String) {
+                                guestUid = (String) auth.getPrincipal();
+                        }
+                }
+
+                boolean result = contentFeedService.toggleTopicBookmark(id, bookmarked, guestUid);
+                return ResponseEntity.ok(result);
+        }
 }
