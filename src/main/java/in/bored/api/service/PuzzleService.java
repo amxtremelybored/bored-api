@@ -114,7 +114,7 @@ public class PuzzleService {
                 });
 
         // 2. Call Gemini
-        int count = 5;
+        int count = 10;
         List<QuizResponse> generated = geminiService.generatePuzzle(count);
 
         if (generated.isEmpty())
