@@ -1,6 +1,7 @@
 // src/main/java/in/bored/api/repo/UserContentViewRepository.java
 package in.bored.api.repo;
 
+import in.bored.api.model.TopicContent;
 import in.bored.api.model.UserContentView;
 import in.bored.api.model.UserProfile;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +18,12 @@ public interface UserContentViewRepository extends JpaRepository<UserContentView
 
     @Query("SELECT v.topic.id FROM UserContentView v WHERE v.guestUid = :guestUid ORDER BY v.viewedAt DESC")
     List<Long> findRecentTopicIdsForGuest(@Param("guestUid") String guestUid, Pageable pageable);
+
+    @Query("SELECT v.topicContent FROM UserContentView v WHERE v.userProfile = :profile AND v.saved = true ORDER BY v.viewedAt DESC")
+    List<TopicContent> findSavedContentForUser(@Param("profile") UserProfile profile, Pageable pageable);
+
+    @Query("SELECT v.topicContent FROM UserContentView v WHERE v.guestUid = :guestUid AND v.saved = true ORDER BY v.viewedAt DESC")
+    List<TopicContent> findSavedContentForGuest(@Param("guestUid") String guestUid, Pageable pageable);
 
     java.util.Optional<UserContentView> findByUserProfileAndTopicContent_Id(UserProfile userProfile,
             Long topicContentId);

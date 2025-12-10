@@ -173,4 +173,21 @@ public class ContentFeedController {
                 ContentItemResponse item = contentFeedService.toggleSave(id, saved, guestUid);
                 return ResponseEntity.ok(item);
         }
+
+        @GetMapping("/saved")
+        public ResponseEntity<List<ContentItemResponse>> getSavedContent(
+                        @RequestParam(defaultValue = "10") int size) {
+
+                String guestUid = null;
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+                        // Can be authenticated User or Guest with valid Firebase UID
+                        if (auth.getPrincipal() instanceof String) {
+                                guestUid = (String) auth.getPrincipal();
+                        }
+                }
+
+                List<ContentItemResponse> items = contentFeedService.getSavedContent(size, guestUid);
+                return ResponseEntity.ok(items);
+        }
 }

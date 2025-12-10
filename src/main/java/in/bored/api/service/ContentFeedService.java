@@ -858,4 +858,19 @@ public class ContentFeedService {
         return response;
     }
 
+    public List<ContentItemResponse> getSavedContent(int size, String guestUid) {
+        Pageable pageable = PageRequest.of(0, size);
+        try {
+            UserProfile user = getCurrentUserProfile();
+            List<TopicContent> contents = userContentViewRepository.findSavedContentForUser(user, pageable);
+            return contents.stream().map(this::toResponse).toList();
+        } catch (Exception e) {
+            // Unauthenticated or user not found
+            if (guestUid != null) {
+                List<TopicContent> contents = userContentViewRepository.findSavedContentForGuest(guestUid, pageable);
+                return contents.stream().map(this::toResponse).toList();
+            }
+            return new java.util.ArrayList<>();
+        }
+    }
 }
