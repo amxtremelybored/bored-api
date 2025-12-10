@@ -230,6 +230,47 @@ public class ContentFeedService {
         return response;
     }
 
+    public List<TopicSummary> getBookmarkedTopics(String guestUid) {
+        UserProfile user = null;
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+                user = getCurrentUserProfile();
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+
+        List<Topic> bookmarkedTopics;
+        if (user != null) {
+            bookmarkedTopics = userTopicBookmarkRepository.findByUserProfile(user)
+                    .stream()
+                    .map(UserTopicBookmark::getTopic)
+                    .toList();
+        } else if (guestUid != null) {
+            bookmarkedTopics = userTopicBookmarkRepository.findByGuestUid(guestUid)
+                    .stream()
+                    .map(UserTopicBookmark::getTopic)
+                    .toList();
+        } else {
+            return Collections.emptyList();
+        }
+
+        return bookmarkedTopics.stream()
+                .map(t -> {
+                    TopicSummary summary = new TopicSummary();
+                    summary.setId(t.getId());
+                    summary.setName(t.getName());
+                    summary.setEmoji(t.getEmoji());
+                    if (t.getCategory() != null) {
+                        summary.setCategoryId(t.getCategory().getId());
+                    }
+                    summary.setBookmarked(true);
+                    return summary;
+                })
+                .toList();
+    }
+
     // ---------------------------------------------------------
     // 2) GUEST feed: random content, no prefs, no views
     // ---------------------------------------------------------

@@ -207,4 +207,19 @@ public class ContentFeedController {
                 boolean result = contentFeedService.toggleTopicBookmark(id, bookmarked, guestUid);
                 return ResponseEntity.ok(result);
         }
+
+        @GetMapping("/topics/bookmarked")
+        public ResponseEntity<List<TopicSummary>> getBookmarkedTopics() {
+
+                String guestUid = null;
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+                        if (auth.getPrincipal() instanceof String) {
+                                guestUid = (String) auth.getPrincipal();
+                        }
+                }
+
+                List<TopicSummary> topics = contentFeedService.getBookmarkedTopics(guestUid);
+                return ResponseEntity.ok(topics);
+        }
 }
