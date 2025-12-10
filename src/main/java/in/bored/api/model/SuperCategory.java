@@ -1,10 +1,12 @@
 package in.bored.api.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -29,6 +31,10 @@ public class SuperCategory {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
+    @OneToMany(mappedBy = "superCategory", fetch = FetchType.EAGER)
+    @JsonManagedReference
+    private List<ContentCategory> contentCategories;
 
     public SuperCategory() {
     }
@@ -79,5 +85,13 @@ public class SuperCategory {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public List<ContentCategory> getContentCategories() {
+        return contentCategories;
+    }
+
+    public void setContentCategories(List<ContentCategory> contentCategories) {
+        this.contentCategories = contentCategories;
     }
 }

@@ -1,6 +1,7 @@
 // src/main/java/in/bored/api/model/ContentCategory.java
 package in.bored.api.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -39,6 +40,7 @@ public class ContentCategory {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
+    @JsonBackReference
     private SuperCategory superCategory;
 
     public ContentCategory() {
