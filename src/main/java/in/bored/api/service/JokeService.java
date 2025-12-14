@@ -43,20 +43,18 @@ public class JokeService {
         }
 
         // 1. Try to find unseen jokes in DB
-        // 1. Try to find unseen jokes in DB
         List<JokeContent> existing = contentRepository.findRandomUnseen(user.getId(), count);
-        if (existing.size() >= count) {
-            return existing;
+        // 2. If not enough, generate new jokes via Gemini
+        if (existing.size() < count) {
+            logger.info("Not enough unseen jokes for user {} (found {}), generating more...", user.getId(),
+                    existing.size());
+            generateAndSaveJokes(10); // Deduplicates internally
+
+            // 3. Try fetching again (should return new unseen, or existing unseen)
+            existing = contentRepository.findRandomUnseen(user.getId(), count);
         }
 
-        // 2. If not enough, generate new jokes via Gemini
-        logger.info("Not enough unseen jokes for user {} (found {}), generating more...", user.getId(),
-                existing.size());
-        generateAndSaveJokes(10); // Deduplicates internally
-
-        // 3. Try fetching again (should return new unseen, or existing unseen)
-        // 3. Try fetching again (should return new unseen, or existing unseen)
-        List<JokeContent> finalResult = contentRepository.findRandomUnseen(user.getId(), count);
+        List<JokeContent> finalResult = existing;
 
         // 4. Mark all as served/viewed to prevent duplicates
         for (JokeContent jc : finalResult) {

@@ -45,21 +45,18 @@ public class PuzzleService {
         List<PuzzleContent> unseen = contentRepository.findRandomUnseen(user.getId(), count);
         log.info("Found {} unseen puzzles in DB", unseen.size());
 
-        // If we found enough, return them
-        if (unseen.size() >= count) {
-            return unseen.stream().map(this::toResponse).collect(java.util.stream.Collectors.toList());
-        }
+        // 2. Fallback: Generate new puzzles via Gemini if needed
+        if (unseen.size() < count) {
+            int numToGen = Math.max(10, count - unseen.size());
+            log.info("Not enough unseen puzzles for user {}. Generating {} via Gemini...", user.getId(), numToGen);
+            java.util.List<PuzzleContent> generated = generateAndSavePuzzles(numToGen);
+            log.info("Generated {} new puzzles", generated.size());
 
-        // 2. Fallback: Generate new puzzles via Gemini
-        int numToGen = Math.max(10, count - unseen.size());
-        log.info("Not enough unseen puzzles for user {}. Generating {} via Gemini...", user.getId(), numToGen);
-        java.util.List<PuzzleContent> generated = generateAndSavePuzzles(numToGen);
-        log.info("Generated {} new puzzles", generated.size());
-
-        if (generated != null && !generated.isEmpty()) {
-            // Re-fetch to ensure we have IDs and respect limit
-            unseen = contentRepository.findRandomUnseen(user.getId(), count);
-            log.info("After generation, found {} unseen puzzles in DB", unseen.size());
+            if (generated != null && !generated.isEmpty()) {
+                // Re-fetch to ensure we have IDs and respect limit
+                unseen = contentRepository.findRandomUnseen(user.getId(), count);
+                log.info("After generation, found {} unseen puzzles in DB", unseen.size());
+            }
         }
 
         // 5. Mark all as served/viewed to prevent duplicates

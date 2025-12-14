@@ -46,18 +46,17 @@ public class DoYouKnowService {
         // 1. Try to find unseen facts in DB
         // 1. Try to find unseen facts in DB
         List<DoYouKnowContent> existing = contentRepository.findRandomUnseen(user.getId(), count);
-        if (existing.size() >= count) {
-            return existing;
+        // 2. If not enough, generate new facts via Gemini
+        if (existing.size() < count) {
+            logger.info("Not enough unseen facts for user {} (found {}), generating more...", user.getId(),
+                    existing.size());
+            generateAndSaveDoYouKnow(10); // Deduplicates internally
+
+            // 3. Try fetching again
+            existing = contentRepository.findRandomUnseen(user.getId(), count);
         }
 
-        // 2. If not enough, generate new facts via Gemini
-        logger.info("Not enough unseen facts for user {} (found {}), generating more...", user.getId(),
-                existing.size());
-        generateAndSaveDoYouKnow(10); // Deduplicates internally
-
-        // 3. Try fetching again
-        // 3. Try fetching again
-        List<DoYouKnowContent> finalResult = contentRepository.findRandomUnseen(user.getId(), count);
+        List<DoYouKnowContent> finalResult = existing;
 
         // 4. Mark all as served/viewed to prevent duplicates
         for (DoYouKnowContent dc : finalResult) {

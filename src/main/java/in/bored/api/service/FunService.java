@@ -45,20 +45,19 @@ public class FunService {
         // 1. Try to find unseen fun items in DB
         // 1. Try to find unseen fun items in DB
         List<FunContent> existing = contentRepository.findRandomUnseen(user.getId(), count);
-        if (existing.size() >= count) {
-            return existing;
+        // 2. If not enough, generate new fun items via Gemini
+        if (existing.size() < count) {
+            // Calculate how many more we need, but maybe just generate a batch of 10 anyway
+            // to be safe/efficient
+            logger.info("Not enough unseen fun content for user {} (found {}), generating more...", user.getId(),
+                    existing.size());
+            generateAndSaveFun(10); // Deduplicates internally
+
+            // 3. Try fetching again
+            existing = contentRepository.findRandomUnseen(user.getId(), count);
         }
 
-        // 2. If not enough, generate new fun items via Gemini
-        // Calculate how many more we need, but maybe just generate a batch of 10 anyway
-        // to be safe/efficient
-        logger.info("Not enough unseen fun content for user {} (found {}), generating more...", user.getId(),
-                existing.size());
-        generateAndSaveFun(10); // Deduplicates internally
-
-        // 3. Try fetching again
-        // 3. Try fetching again
-        List<FunContent> finalResult = contentRepository.findRandomUnseen(user.getId(), count);
+        List<FunContent> finalResult = existing;
 
         // 4. Mark all as served/viewed to prevent duplicates
         for (FunContent fc : finalResult) {
