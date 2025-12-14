@@ -18,4 +18,7 @@ public interface DoYouKnowContentRepository extends JpaRepository<DoYouKnowConte
                 LIMIT :limit
             """, nativeQuery = true)
     List<DoYouKnowContent> findRandomUnseen(@Param("userId") Long userId, @Param("limit") int limit);
+
+    // Deduplication
+    java.util.Optional<DoYouKnowContent> findByFact(String fact);
 }

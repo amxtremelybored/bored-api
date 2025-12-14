@@ -87,24 +87,30 @@ public class QuizService {
 
         java.util.List<QuizContent> savedQuizzes = new java.util.ArrayList<>();
         for (QuizResponse dto : generated) {
-            QuizContent qc = new QuizContent();
-            qc.setCategory(category);
-            qc.setQuestion(dto.getQuestion());
-            qc.setAnswer(dto.getAnswer());
-            qc.setOptions(dto.getOptions());
-            qc.setDifficultyLevel(dto.getDifficultyLevel());
-            savedQuizzes.add(qc);
+            Optional<QuizContent> existing = quizContentRepository.findByQuestion(dto.getQuestion());
+            if (existing.isPresent()) {
+                savedQuizzes.add(existing.get());
+            } else {
+                QuizContent qc = new QuizContent();
+                qc.setCategory(category);
+                qc.setQuestion(dto.getQuestion());
+                qc.setAnswer(dto.getAnswer());
+                qc.setOptions(dto.getOptions());
+                qc.setDifficultyLevel(dto.getDifficultyLevel());
+                savedQuizzes.add(quizContentRepository.save(qc));
+            }
         }
-        savedQuizzes = quizContentRepository.saveAll(savedQuizzes);
 
-        // 4. Mark the FIRST one as viewed immediately and return it
+        // 4. Mark the FIRST one as viewed immediately and return it, IF UNSEEN
         QuizContent firstQuiz = savedQuizzes.get(0);
 
-        UserQuizView view = new UserQuizView();
-        view.setUserProfile(profile);
-        view.setQuizContent(firstQuiz);
-        // isCorrect is null initially
-        userQuizViewRepository.save(view);
+        if (!userQuizViewRepository.existsByUserProfileAndQuizContent(profile, firstQuiz)) {
+            UserQuizView view = new UserQuizView();
+            view.setUserProfile(profile);
+            view.setQuizContent(firstQuiz);
+            // isCorrect is null initially
+            userQuizViewRepository.save(view);
+        }
 
         return toResponse(firstQuiz);
     }

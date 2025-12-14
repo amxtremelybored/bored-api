@@ -44,6 +44,7 @@ public class DoYouKnowService {
         }
 
         // 1. Try to find unseen facts in DB
+        // 1. Try to find unseen facts in DB
         List<DoYouKnowContent> existing = contentRepository.findRandomUnseen(user.getId(), count);
         if (existing.size() >= count) {
             return existing;
@@ -52,7 +53,7 @@ public class DoYouKnowService {
         // 2. If not enough, generate new facts via Gemini
         logger.info("Not enough unseen facts for user {} (found {}), generating more...", user.getId(),
                 existing.size());
-        generateAndSaveDoYouKnow(10);
+        generateAndSaveDoYouKnow(10); // Deduplicates internally
 
         // 3. Try fetching again
         return contentRepository.findRandomUnseen(user.getId(), count);
@@ -93,8 +94,11 @@ public class DoYouKnowService {
                         .save(new DoYouKnowCategory("General Facts", "Interesting general knowledge facts")));
 
         for (String fact : newItems) {
-            DoYouKnowContent content = new DoYouKnowContent(category.getId(), fact, "Gemini");
-            contentRepository.save(content);
+            java.util.Optional<DoYouKnowContent> existing = contentRepository.findByFact(fact);
+            if (existing.isEmpty()) {
+                DoYouKnowContent content = new DoYouKnowContent(category.getId(), fact, "Gemini");
+                contentRepository.save(content);
+            }
         }
     }
 

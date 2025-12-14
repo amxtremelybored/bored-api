@@ -58,7 +58,9 @@ public class PuzzleService {
         }
 
         // 3. Mark as viewed immediately
-        markAsViewedInternal(user, puzzle, null);
+        if (!viewRepository.existsByUserProfileAndPuzzleContent(user, puzzle)) {
+            markAsViewedInternal(user, puzzle, null);
+        }
 
         // 4. Convert to DTO
         QuizResponse response = new QuizResponse();
@@ -123,14 +125,21 @@ public class PuzzleService {
         PuzzleContent first = null;
 
         for (QuizResponse dto : generated) {
-            PuzzleContent content = new PuzzleContent();
-            content.setCategory(category);
-            content.setQuestion(dto.getQuestion());
-            content.setAnswer(dto.getAnswer());
-            content.setOptions(dto.getOptions()); // JSON string
-            content.setDifficultyLevel(1);
+            Optional<PuzzleContent> existing = contentRepository.findByQuestion(dto.getQuestion());
+            PuzzleContent content;
 
-            content = contentRepository.save(content);
+            if (existing.isPresent()) {
+                content = existing.get();
+            } else {
+                content = new PuzzleContent();
+                content.setCategory(category);
+                content.setQuestion(dto.getQuestion());
+                content.setAnswer(dto.getAnswer());
+                content.setOptions(dto.getOptions()); // JSON string
+                content.setDifficultyLevel(1);
+                content = contentRepository.save(content);
+            }
+
             if (first == null)
                 first = content;
         }

@@ -43,6 +43,7 @@ public class FunService {
         }
 
         // 1. Try to find unseen fun items in DB
+        // 1. Try to find unseen fun items in DB
         List<FunContent> existing = contentRepository.findRandomUnseen(user.getId(), count);
         if (existing.size() >= count) {
             return existing;
@@ -53,7 +54,7 @@ public class FunService {
         // to be safe/efficient
         logger.info("Not enough unseen fun content for user {} (found {}), generating more...", user.getId(),
                 existing.size());
-        generateAndSaveFun(10);
+        generateAndSaveFun(10); // Deduplicates internally
 
         // 3. Try fetching again
         return contentRepository.findRandomUnseen(user.getId(), count);
@@ -81,9 +82,12 @@ public class FunService {
         FunCategory category = categoryRepository.findByName("Anecdotes")
                 .orElseGet(() -> categoryRepository.save(new FunCategory("Anecdotes", "Fun anecdotes and gags")));
 
-        for (String content : newItems) {
-            FunContent funContent = new FunContent(category.getId(), content, "Gemini");
-            contentRepository.save(funContent);
+        for (String contentStr : newItems) {
+            java.util.Optional<FunContent> existing = contentRepository.findByContent(contentStr);
+            if (existing.isEmpty()) {
+                FunContent funContent = new FunContent(category.getId(), contentStr, "Gemini");
+                contentRepository.save(funContent);
+            }
         }
     }
 

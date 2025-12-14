@@ -6,4 +6,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface UserPuzzleViewRepository extends JpaRepository<UserPuzzleView, Long> {
+
+    boolean existsByUserProfileAndPuzzleContent(in.bored.api.model.UserProfile userProfile,
+            in.bored.api.model.PuzzleContent puzzleContent);
 }

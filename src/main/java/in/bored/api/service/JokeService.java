@@ -43,6 +43,7 @@ public class JokeService {
         }
 
         // 1. Try to find unseen jokes in DB
+        // 1. Try to find unseen jokes in DB
         List<JokeContent> existing = contentRepository.findRandomUnseen(user.getId(), count);
         if (existing.size() >= count) {
             return existing;
@@ -51,9 +52,9 @@ public class JokeService {
         // 2. If not enough, generate new jokes via Gemini
         logger.info("Not enough unseen jokes for user {} (found {}), generating more...", user.getId(),
                 existing.size());
-        generateAndSaveJokes(10);
+        generateAndSaveJokes(10); // Deduplicates internally
 
-        // 3. Try fetching again
+        // 3. Try fetching again (should return new unseen, or existing unseen)
         return contentRepository.findRandomUnseen(user.getId(), count);
     }
 
@@ -80,8 +81,12 @@ public class JokeService {
                 .orElseGet(() -> categoryRepository.save(new JokeCategory("Generic Jokes", "General purpose jokes")));
 
         for (JokeContent joke : newJokes) {
-            joke.setCategoryId(category.getId());
-            contentRepository.save(joke);
+            java.util.Optional<JokeContent> existing = contentRepository.findBySetupAndPunchline(joke.getSetup(),
+                    joke.getPunchline());
+            if (existing.isEmpty()) {
+                joke.setCategoryId(category.getId());
+                contentRepository.save(joke);
+            }
         }
     }
 

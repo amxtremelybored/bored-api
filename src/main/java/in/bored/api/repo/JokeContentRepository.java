@@ -18,4 +18,7 @@ public interface JokeContentRepository extends JpaRepository<JokeContent, Long> 
                 LIMIT :limit
             """, nativeQuery = true)
     List<JokeContent> findRandomUnseen(@Param("userId") Long userId, @Param("limit") int limit);
+
+    // Deduplication
+    java.util.Optional<JokeContent> findBySetupAndPunchline(String setup, String punchline);
 }

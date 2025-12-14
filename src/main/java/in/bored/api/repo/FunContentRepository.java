@@ -18,4 +18,7 @@ public interface FunContentRepository extends JpaRepository<FunContent, Long> {
                 LIMIT :limit
             """, nativeQuery = true)
     List<FunContent> findRandomUnseen(@Param("userId") Long userId, @Param("limit") int limit);
+
+    // Deduplication
+    java.util.Optional<FunContent> findByContent(String content);
 }

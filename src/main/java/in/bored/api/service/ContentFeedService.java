@@ -170,18 +170,34 @@ public class ContentFeedService {
                 // Persist new content
                 List<TopicContent> newContents = new java.util.ArrayList<>();
                 for (ContentItemResponse item : generatedItems) {
-                    TopicContent tc = new TopicContent();
-                    tc.setTopic(fallbackTopic);
-                    tc.setContent(item.getContent());
-                    tc.setContentIndex(nextIndex++);
-                    // prePersist will set createdAt
-                    newContents.add(tc);
+                    java.util.Optional<TopicContent> existing = topicContentRepository.findByTopicAndContent(
+                            fallbackTopic,
+                            item.getContent());
+                    if (existing.isPresent()) {
+                        newContents.add(existing.get());
+                    } else {
+                        TopicContent tc = new TopicContent();
+                        tc.setTopic(fallbackTopic);
+                        tc.setContent(item.getContent());
+                        tc.setContentIndex(nextIndex++);
+                        // prePersist will set createdAt
+                        newContents.add(topicContentRepository.save(tc));
+                    }
+                }
+                List<TopicContent> savedContents = newContents;
+
+                // Filter out items already seen by user
+                List<TopicContent> unseenContents = new java.util.ArrayList<>();
+                for (TopicContent tc : savedContents) {
+                    boolean seen = userContentViewRepository.findByUserProfileAndTopicContent_Id(profile, tc.getId())
+                            .isPresent();
+                    if (!seen) {
+                        unseenContents.add(tc);
+                    }
                 }
 
-                List<TopicContent> savedContents = topicContentRepository.saveAll(newContents);
-
                 // Mark as viewed immediately
-                List<UserContentView> newViews = savedContents.stream()
+                List<UserContentView> newViews = unseenContents.stream()
                         .map(c -> {
                             UserContentView v = new UserContentView();
                             v.setUserProfile(profile);
@@ -194,7 +210,7 @@ public class ContentFeedService {
                 userContentViewRepository.saveAll(newViews);
 
                 // Return mapped response
-                List<ContentItemResponse> response = savedContents.stream()
+                List<ContentItemResponse> response = unseenContents.stream()
                         .map(c -> {
                             ContentItemResponse dto = this.toResponse(c);
                             dto.setSource("Gemini");
@@ -323,14 +339,20 @@ public class ContentFeedService {
                     // Persist new content
                     List<TopicContent> newContents = new java.util.ArrayList<>();
                     for (ContentItemResponse item : generatedItems) {
-                        TopicContent tc = new TopicContent();
-                        tc.setTopic(randomTopic);
-                        tc.setContent(item.getContent());
-                        tc.setContentIndex(nextIndex++);
-                        tc.setCreatedAt(OffsetDateTime.now());
-                        newContents.add(tc);
+                        java.util.Optional<TopicContent> existing = topicContentRepository
+                                .findByTopicAndContent(randomTopic, item.getContent());
+                        if (existing.isPresent()) {
+                            newContents.add(existing.get());
+                        } else {
+                            TopicContent tc = new TopicContent();
+                            tc.setTopic(randomTopic);
+                            tc.setContent(item.getContent());
+                            tc.setContentIndex(nextIndex++);
+                            tc.setCreatedAt(OffsetDateTime.now());
+                            newContents.add(topicContentRepository.save(tc));
+                        }
                     }
-                    List<TopicContent> savedContents = topicContentRepository.saveAll(newContents);
+                    List<TopicContent> savedContents = newContents;
 
                     // Update flags for Topic and Category
                     OffsetDateTime now = OffsetDateTime.now();
@@ -348,6 +370,17 @@ public class ContentFeedService {
 
                     // If guestUid provided, save views for generated content too!
                     if (request != null && request.getGuestUid() != null && !request.getGuestUid().isEmpty()) {
+                        String guestUid = request.getGuestUid();
+                        List<TopicContent> unseenContents = new java.util.ArrayList<>();
+                        for (TopicContent tc : savedContents) {
+                            boolean seen = userContentViewRepository
+                                    .findByGuestUidAndTopicContent_Id(guestUid, tc.getId()).isPresent();
+                            if (!seen) {
+                                unseenContents.add(tc);
+                            }
+                        }
+                        savedContents = unseenContents; // Only return unseen
+
                         List<UserContentView> views = new java.util.ArrayList<>();
                         for (TopicContent tc : savedContents) {
                             UserContentView view = new UserContentView();
@@ -428,14 +461,20 @@ public class ContentFeedService {
 
                 List<TopicContent> newContents = new java.util.ArrayList<>();
                 for (ContentItemResponse item : generatedItems) {
-                    TopicContent tc = new TopicContent();
-                    tc.setTopic(targetTopic);
-                    tc.setContent(item.getContent());
-                    tc.setContentIndex(nextIndex++);
-                    tc.setCreatedAt(OffsetDateTime.now());
-                    newContents.add(tc);
+                    java.util.Optional<TopicContent> existing = topicContentRepository
+                            .findByTopicAndContent(targetTopic, item.getContent());
+                    if (existing.isPresent()) {
+                        newContents.add(existing.get());
+                    } else {
+                        TopicContent tc = new TopicContent();
+                        tc.setTopic(targetTopic);
+                        tc.setContent(item.getContent());
+                        tc.setContentIndex(nextIndex++);
+                        tc.setCreatedAt(OffsetDateTime.now());
+                        newContents.add(topicContentRepository.save(tc));
+                    }
                 }
-                List<TopicContent> savedContents = topicContentRepository.saveAll(newContents);
+                List<TopicContent> savedContents = newContents;
 
                 // Update flags
                 OffsetDateTime now = OffsetDateTime.now();
@@ -452,6 +491,17 @@ public class ContentFeedService {
 
                 // Save history if guestUid present
                 if (request != null && request.getGuestUid() != null && !request.getGuestUid().isEmpty()) {
+                    String guestUid = request.getGuestUid();
+                    List<TopicContent> unseenContents = new java.util.ArrayList<>();
+                    for (TopicContent tc : savedContents) {
+                        boolean seen = userContentViewRepository.findByGuestUidAndTopicContent_Id(guestUid, tc.getId())
+                                .isPresent();
+                        if (!seen) {
+                            unseenContents.add(tc);
+                        }
+                    }
+                    savedContents = unseenContents;
+
                     List<UserContentView> views = new java.util.ArrayList<>();
                     for (TopicContent tc : savedContents) {
                         UserContentView view = new UserContentView();
