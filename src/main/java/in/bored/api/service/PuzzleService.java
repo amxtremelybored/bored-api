@@ -34,44 +34,43 @@ public class PuzzleService {
     private final GeminiService geminiService;
 
     @Transactional
-    public QuizResponse getNextPuzzleForCurrentUser() {
+    public java.util.List<QuizResponse> getNextPuzzlesForCurrentUser(int count) {
         UserProfile user = getCurrentUserProfile();
         if (user == null) {
             throw new RuntimeException("User not found");
         }
 
         // 1. Try to find an unseen puzzle in DB
-        List<PuzzleContent> unseen = contentRepository.findRandomUnseen(user.getId());
+        List<PuzzleContent> unseen = contentRepository.findRandomUnseen(user.getId(), count);
 
-        PuzzleContent puzzle;
-        if (!unseen.isEmpty()) {
-            puzzle = unseen.get(0);
-            log.info("Found existing unseen puzzle ID: {}", puzzle.getId());
-        } else {
-            // 2. Fallback: Generate new puzzles via Gemini
-            log.info("No unseen puzzles found for user {}. Generating via Gemini...", user.getId());
-            puzzle = generateAndSavePuzzles();
+        // If we found enough, return them
+        if (unseen.size() >= count) {
+            return unseen.stream().map(this::toResponse).collect(java.util.stream.Collectors.toList());
         }
 
-        if (puzzle == null) {
-            return null; // Should not happen if Gemini works
-        }
+        // 2. Fallback: Generate new puzzles via Gemini
+        int numToGen = Math.max(10, count - unseen.size());
+        log.info("Not enough unseen puzzles for user {}. Generating {} via Gemini...", user.getId(), numToGen);
+        java.util.List<PuzzleContent> generated = generateAndSavePuzzles(numToGen);
 
-        // 3. Mark as viewed immediately
-        if (!viewRepository.existsByUserProfileAndPuzzleContent(user, puzzle)) {
-            markAsViewedInternal(user, puzzle, null);
+        if (generated != null && !generated.isEmpty()) {
+            // Re-fetch to ensure we have IDs and respect limit
+            unseen = contentRepository.findRandomUnseen(user.getId(), count);
         }
 
         // 4. Convert to DTO
+        return unseen.stream().map(this::toResponse).collect(java.util.stream.Collectors.toList());
+    }
+
+    private QuizResponse toResponse(PuzzleContent puzzle) {
         QuizResponse response = new QuizResponse();
         response.setId(puzzle.getId());
-        response.setCategoryId(puzzle.getCategory().getId()); // Fix: Pass UUID directly
+        response.setCategoryId(puzzle.getCategory().getId());
         response.setCategoryName(puzzle.getCategory().getName());
         response.setQuestion(puzzle.getQuestion());
         response.setAnswer(puzzle.getAnswer());
         response.setOptions(puzzle.getOptions());
         response.setDifficultyLevel(puzzle.getDifficultyLevel());
-
         return response;
     }
 
@@ -101,7 +100,7 @@ public class PuzzleService {
         }
     }
 
-    private PuzzleContent generateAndSavePuzzles() {
+    private java.util.List<PuzzleContent> generateAndSavePuzzles(int count) {
         // 1. Get or create default category
         PuzzleCategory category = categoryRepository.findAll().stream()
                 .filter(c -> "Generic Puzzles".equals(c.getName()))
@@ -116,13 +115,12 @@ public class PuzzleService {
                 });
 
         // 2. Call Gemini
-        int count = 10;
         List<QuizResponse> generated = geminiService.generatePuzzle(count);
 
         if (generated.isEmpty())
-            return null;
+            return java.util.Collections.emptyList();
 
-        PuzzleContent first = null;
+        java.util.List<PuzzleContent> savedList = new java.util.ArrayList<>();
 
         for (QuizResponse dto : generated) {
             Optional<PuzzleContent> existing = contentRepository.findByQuestion(dto.getQuestion());
@@ -139,12 +137,10 @@ public class PuzzleService {
                 content.setDifficultyLevel(1);
                 content = contentRepository.save(content);
             }
-
-            if (first == null)
-                first = content;
+            savedList.add(content);
         }
 
-        return first;
+        return savedList;
     }
 
     private UserProfile getCurrentUserProfile() {

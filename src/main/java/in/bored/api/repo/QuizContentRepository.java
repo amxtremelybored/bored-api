@@ -12,8 +12,8 @@ import java.util.Optional;
 @Repository
 public interface QuizContentRepository extends JpaRepository<QuizContent, Long> {
 
-    @Query(value = "SELECT * FROM quiz_content q WHERE q.id NOT IN (SELECT v.quiz_content_id FROM user_quiz_view v WHERE v.user_profile_id = :#{#profile.id}) ORDER BY RANDOM() LIMIT 1", nativeQuery = true)
-    Optional<QuizContent> findRandomUnseen(@Param("profile") UserProfile profile);
+    @Query(value = "SELECT * FROM quiz_content q WHERE q.id NOT IN (SELECT v.quiz_content_id FROM user_quiz_view v WHERE v.user_profile_id = :userProfileId) ORDER BY RANDOM() LIMIT :limit", nativeQuery = true)
+    java.util.List<QuizContent> findRandomUnseen(@Param("userProfileId") Long userProfileId, @Param("limit") int limit);
 
     // Deduplication
     Optional<QuizContent> findByQuestion(String question);

@@ -39,24 +39,23 @@ public class QuizService {
         this.geminiService = geminiService;
     }
 
-    public QuizResponse getNextQuizForCurrentUser() {
+    public java.util.List<QuizResponse> getNextQuizzesForCurrentUser(int count) {
         UserProfile profile = getCurrentUserProfile();
 
         // 1. Try to find random unseen quiz from DB
-        Optional<QuizContent> quizOpt = quizContentRepository.findRandomUnseen(profile);
+        java.util.List<QuizContent> existing = quizContentRepository.findRandomUnseen(profile.getId(), count);
 
-        if (quizOpt.isPresent()) {
-            return toResponse(quizOpt.get());
+        // If we found enough, return them
+        if (existing.size() >= count) {
+            return existing.stream().map(this::toResponse).collect(java.util.stream.Collectors.toList());
         }
 
         // 2. Fallback: Generate from Gemini
-        // Pick a random category name or topic. For now, let's pick a random existing
-        // category if any,
-        // or default to "General Knowledge"
+        // Pick a random category name or topic.
         String topicName = "General Knowledge";
-        long count = quizCategoryRepository.count();
-        if (count > 0) {
-            int idx = (int) (Math.random() * count);
+        long catCount = quizCategoryRepository.count();
+        if (catCount > 0) {
+            int idx = (int) (Math.random() * catCount);
             org.springframework.data.domain.Page<in.bored.api.model.QuizCategory> page = quizCategoryRepository
                     .findAll(org.springframework.data.domain.PageRequest.of(idx, 1));
             if (page.hasContent()) {
@@ -64,55 +63,47 @@ public class QuizService {
             }
         }
 
-        // Generate 5 questions for set 1 (can randomize set number later)
+        // Generate batch
+        // We need (count - existing.size()) more, but let's ask for 10 at minimum to be
+        // safe
+        int numToGen = Math.max(10, count - existing.size());
+
+        // Use a random set number to vary content
         int setNumber = (int) (Math.random() * 100) + 1;
-        java.util.List<QuizResponse> generated = geminiService.generateQuiz(topicName, 5, setNumber);
 
-        if (generated.isEmpty()) {
-            return null;
-        }
+        java.util.List<QuizResponse> generated = geminiService.generateQuiz(topicName, numToGen, setNumber);
 
-        // 3. Save generated quizzes
-        // Ensure category exists
-        String finalTopicName = topicName;
-        in.bored.api.model.QuizCategory category = quizCategoryRepository.findAll().stream()
-                .filter(c -> c.getName().equalsIgnoreCase(finalTopicName))
-                .findFirst()
-                .orElseGet(() -> {
-                    in.bored.api.model.QuizCategory newCat = new in.bored.api.model.QuizCategory();
-                    newCat.setName(finalTopicName);
-                    newCat.setEmoji("❓"); // Default emoji
-                    return quizCategoryRepository.save(newCat);
-                });
+        if (!generated.isEmpty()) {
+            // 3. Save generated quizzes
+            String finalTopicName = topicName;
+            in.bored.api.model.QuizCategory category = quizCategoryRepository.findAll().stream()
+                    .filter(c -> c.getName().equalsIgnoreCase(finalTopicName))
+                    .findFirst()
+                    .orElseGet(() -> {
+                        in.bored.api.model.QuizCategory newCat = new in.bored.api.model.QuizCategory();
+                        newCat.setName(finalTopicName);
+                        newCat.setEmoji("❓"); // Default emoji
+                        return quizCategoryRepository.save(newCat);
+                    });
 
-        java.util.List<QuizContent> savedQuizzes = new java.util.ArrayList<>();
-        for (QuizResponse dto : generated) {
-            Optional<QuizContent> existing = quizContentRepository.findByQuestion(dto.getQuestion());
-            if (existing.isPresent()) {
-                savedQuizzes.add(existing.get());
-            } else {
-                QuizContent qc = new QuizContent();
-                qc.setCategory(category);
-                qc.setQuestion(dto.getQuestion());
-                qc.setAnswer(dto.getAnswer());
-                qc.setOptions(dto.getOptions());
-                qc.setDifficultyLevel(dto.getDifficultyLevel());
-                savedQuizzes.add(quizContentRepository.save(qc));
+            for (QuizResponse dto : generated) {
+                Optional<QuizContent> dupeCheck = quizContentRepository.findByQuestion(dto.getQuestion());
+                if (dupeCheck.isEmpty()) {
+                    QuizContent qc = new QuizContent();
+                    qc.setCategory(category);
+                    qc.setQuestion(dto.getQuestion());
+                    qc.setAnswer(dto.getAnswer());
+                    qc.setOptions(dto.getOptions());
+                    qc.setDifficultyLevel(dto.getDifficultyLevel());
+                    quizContentRepository.save(qc);
+                }
             }
+
+            // 4. Refetch to get IDs and any missed ones
+            existing = quizContentRepository.findRandomUnseen(profile.getId(), count);
         }
 
-        // 4. Mark the FIRST one as viewed immediately and return it, IF UNSEEN
-        QuizContent firstQuiz = savedQuizzes.get(0);
-
-        if (!userQuizViewRepository.existsByUserProfileAndQuizContent(profile, firstQuiz)) {
-            UserQuizView view = new UserQuizView();
-            view.setUserProfile(profile);
-            view.setQuizContent(firstQuiz);
-            // isCorrect is null initially
-            userQuizViewRepository.save(view);
-        }
-
-        return toResponse(firstQuiz);
+        return existing.stream().map(this::toResponse).collect(java.util.stream.Collectors.toList());
     }
 
     @Transactional

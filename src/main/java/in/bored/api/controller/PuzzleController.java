@@ -18,9 +18,9 @@ public class PuzzleController {
     private final PuzzleService puzzleService;
 
     @GetMapping("/next")
-    public ResponseEntity<QuizResponse> getNextPuzzle() {
-        QuizResponse response = puzzleService.getNextPuzzleForCurrentUser();
-        if (response == null) {
+    public ResponseEntity<java.util.List<QuizResponse>> getNextPuzzle(@RequestParam(defaultValue = "10") int size) {
+        java.util.List<QuizResponse> response = puzzleService.getNextPuzzlesForCurrentUser(size);
+        if (response.isEmpty()) {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.ok(response);

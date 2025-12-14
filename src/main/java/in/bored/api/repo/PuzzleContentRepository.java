@@ -17,9 +17,9 @@ public interface PuzzleContentRepository extends JpaRepository<PuzzleContent, Lo
                 LEFT JOIN user_puzzle_view upv ON pc.id = upv.puzzle_content_id AND upv.user_profile_id = :userId
                 WHERE upv.id IS NULL
                 ORDER BY RANDOM()
-                LIMIT 1
+                LIMIT :limit
             """, nativeQuery = true)
-    List<PuzzleContent> findRandomUnseen(@Param("userId") Long userId);
+    List<PuzzleContent> findRandomUnseen(@Param("userId") Long userId, @Param("limit") int limit);
 
     // Deduplication
     Optional<PuzzleContent> findByQuestion(String question);

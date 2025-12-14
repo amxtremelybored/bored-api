@@ -18,12 +18,12 @@ public class QuizController {
     }
 
     @GetMapping("/next")
-    public ResponseEntity<QuizResponse> getNextQuiz() {
-        QuizResponse quiz = quizService.getNextQuizForCurrentUser();
-        if (quiz == null) {
+    public ResponseEntity<java.util.List<QuizResponse>> getNextQuiz(@RequestParam(defaultValue = "10") int size) {
+        java.util.List<QuizResponse> quizzes = quizService.getNextQuizzesForCurrentUser(size);
+        if (quizzes.isEmpty()) {
             return ResponseEntity.noContent().build();
         }
-        return ResponseEntity.ok(quiz);
+        return ResponseEntity.ok(quizzes);
     }
 
     @PostMapping("/{id}/view")
