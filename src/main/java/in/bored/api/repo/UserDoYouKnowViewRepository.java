@@ -10,6 +10,5 @@ import org.springframework.stereotype.Repository;
 public interface UserDoYouKnowViewRepository extends JpaRepository<UserDoYouKnowView, Long> {
     Optional<UserDoYouKnowView> findByUserProfileIdAndDoYouKnowContentId(Long userProfileId, Long doYouKnowContentId);
 
-    boolean existsByUserProfileAndDoYouKnowContent(in.bored.api.model.UserProfile userProfile,
-            in.bored.api.model.DoYouKnowContent doYouKnowContent);
+    boolean existsByUserProfileIdAndDoYouKnowContentId(Long userProfileId, Long doYouKnowContentId);
 }

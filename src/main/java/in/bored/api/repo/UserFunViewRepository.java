@@ -7,6 +7,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UserFunViewRepository extends JpaRepository<UserFunView, Long> {
 
-    boolean existsByUserProfileAndFunContent(in.bored.api.model.UserProfile userProfile,
-            in.bored.api.model.FunContent funContent);
+    boolean existsByUserProfileIdAndFunContentId(Long userProfileId, Long funContentId);
 }
