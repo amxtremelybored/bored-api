@@ -12,13 +12,7 @@ import java.util.Optional;
 @Repository
 public interface PuzzleContentRepository extends JpaRepository<PuzzleContent, Long> {
 
-    @Query(value = """
-                SELECT pc.* FROM puzzle_content pc
-                LEFT JOIN user_puzzle_view upv ON pc.id = upv.puzzle_content_id AND upv.user_profile_id = :userId
-                WHERE upv.id IS NULL
-                ORDER BY RANDOM()
-                LIMIT :limit
-            """, nativeQuery = true)
+    @Query(value = "SELECT * FROM puzzle_content q WHERE q.id NOT IN (SELECT v.puzzle_content_id FROM user_puzzle_view v WHERE v.user_profile_id = :userId) ORDER BY RANDOM() LIMIT :limit", nativeQuery = true)
     List<PuzzleContent> findRandomUnseen(@Param("userId") Long userId, @Param("limit") int limit);
 
     // Deduplication

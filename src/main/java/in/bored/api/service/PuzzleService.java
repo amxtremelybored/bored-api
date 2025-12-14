@@ -39,9 +39,11 @@ public class PuzzleService {
         if (user == null) {
             throw new RuntimeException("User not found");
         }
+        log.info("Fetching {} puzzles for user {}", count, user.getId());
 
         // 1. Try to find an unseen puzzle in DB
         List<PuzzleContent> unseen = contentRepository.findRandomUnseen(user.getId(), count);
+        log.info("Found {} unseen puzzles in DB", unseen.size());
 
         // If we found enough, return them
         if (unseen.size() >= count) {
@@ -52,10 +54,12 @@ public class PuzzleService {
         int numToGen = Math.max(10, count - unseen.size());
         log.info("Not enough unseen puzzles for user {}. Generating {} via Gemini...", user.getId(), numToGen);
         java.util.List<PuzzleContent> generated = generateAndSavePuzzles(numToGen);
+        log.info("Generated {} new puzzles", generated.size());
 
         if (generated != null && !generated.isEmpty()) {
             // Re-fetch to ensure we have IDs and respect limit
             unseen = contentRepository.findRandomUnseen(user.getId(), count);
+            log.info("After generation, found {} unseen puzzles in DB", unseen.size());
         }
 
         // 4. Convert to DTO
