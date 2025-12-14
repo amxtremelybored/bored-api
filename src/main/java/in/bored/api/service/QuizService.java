@@ -103,6 +103,17 @@ public class QuizService {
             existing = quizContentRepository.findRandomUnseen(profile.getId(), count);
         }
 
+        // 5. Mark all as served/viewed to prevent duplicates
+        for (QuizContent qc : existing) {
+            if (!userQuizViewRepository.existsByUserProfileAndQuizContent(profile, qc)) {
+                UserQuizView view = new UserQuizView();
+                view.setUserProfile(profile);
+                view.setQuizContent(qc);
+                view.setIsCorrect(null); // Not answered yet, just served
+                userQuizViewRepository.save(view);
+            }
+        }
+
         return existing.stream().map(this::toResponse).collect(java.util.stream.Collectors.toList());
     }
 

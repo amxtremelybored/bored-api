@@ -55,7 +55,22 @@ public class JokeService {
         generateAndSaveJokes(10); // Deduplicates internally
 
         // 3. Try fetching again (should return new unseen, or existing unseen)
-        return contentRepository.findRandomUnseen(user.getId(), count);
+        // 3. Try fetching again (should return new unseen, or existing unseen)
+        List<JokeContent> finalResult = contentRepository.findRandomUnseen(user.getId(), count);
+
+        // 4. Mark all as served/viewed to prevent duplicates
+        for (JokeContent jc : finalResult) {
+            if (!userViewRepository.existsByUserProfileIdAndJokeContentId(user.getId(), jc.getId())) {
+                try {
+                    UserJokeView view = new UserJokeView(user.getId(), jc.getId(), null);
+                    userViewRepository.save(view);
+                } catch (Exception e) {
+                    logger.warn("Could not save joke view: {}", e.getMessage());
+                }
+            }
+        }
+
+        return finalResult;
     }
 
     public void markJokeAsViewed(Long jokeId, Boolean isLiked) {

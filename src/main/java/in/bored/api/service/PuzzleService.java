@@ -62,7 +62,18 @@ public class PuzzleService {
             log.info("After generation, found {} unseen puzzles in DB", unseen.size());
         }
 
-        // 4. Convert to DTO
+        // 5. Mark all as served/viewed to prevent duplicates
+        for (PuzzleContent pc : unseen) {
+            if (!viewRepository.existsByUserProfileAndPuzzleContent(user, pc)) {
+                UserPuzzleView view = new UserPuzzleView();
+                view.setUserProfile(user);
+                view.setPuzzleContent(pc);
+                view.setIsCorrect(null);
+                viewRepository.save(view);
+            }
+        }
+
+        // 6. Convert to DTO
         return unseen.stream().map(this::toResponse).collect(java.util.stream.Collectors.toList());
     }
 

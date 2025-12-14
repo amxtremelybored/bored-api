@@ -57,7 +57,22 @@ public class FunService {
         generateAndSaveFun(10); // Deduplicates internally
 
         // 3. Try fetching again
-        return contentRepository.findRandomUnseen(user.getId(), count);
+        // 3. Try fetching again
+        List<FunContent> finalResult = contentRepository.findRandomUnseen(user.getId(), count);
+
+        // 4. Mark all as served/viewed to prevent duplicates
+        for (FunContent fc : finalResult) {
+            if (!userViewRepository.existsByUserProfileIdAndFunContentId(user.getId(), fc.getId())) {
+                try {
+                    UserFunView view = new UserFunView(user.getId(), fc.getId(), null);
+                    userViewRepository.save(view);
+                } catch (Exception e) {
+                    logger.warn("Could not save fun view: {}", e.getMessage());
+                }
+            }
+        }
+
+        return finalResult;
     }
 
     public void markFunAsViewed(Long funId, Boolean isLiked) {

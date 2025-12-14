@@ -56,7 +56,22 @@ public class DoYouKnowService {
         generateAndSaveDoYouKnow(10); // Deduplicates internally
 
         // 3. Try fetching again
-        return contentRepository.findRandomUnseen(user.getId(), count);
+        // 3. Try fetching again
+        List<DoYouKnowContent> finalResult = contentRepository.findRandomUnseen(user.getId(), count);
+
+        // 4. Mark all as served/viewed to prevent duplicates
+        for (DoYouKnowContent dc : finalResult) {
+            if (!userViewRepository.existsByUserProfileIdAndDoYouKnowContentId(user.getId(), dc.getId())) {
+                try {
+                    UserDoYouKnowView view = new UserDoYouKnowView(user.getId(), dc.getId(), null);
+                    userViewRepository.save(view);
+                } catch (Exception e) {
+                    logger.warn("Could not save fact view: {}", e.getMessage());
+                }
+            }
+        }
+
+        return finalResult;
     }
 
     public void markDoYouKnowAsViewed(Long contentId, Boolean isLiked) {
