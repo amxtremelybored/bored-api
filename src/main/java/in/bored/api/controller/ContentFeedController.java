@@ -138,6 +138,12 @@ public class ContentFeedController {
                 return ResponseEntity.ok(summary);
         }
 
+        @PostMapping("/stress-next")
+        public ResponseEntity<List<ContentItemResponse>> getStressContent() {
+                // Hardcoded to 10 items, no auth checks, no logic
+                return ResponseEntity.ok(contentFeedService.fetchSimpleRandom(10));
+        }
+
         @GetMapping("/search")
         public ResponseEntity<List<ContentItemResponse>> searchContent(
                         @RequestParam String query,

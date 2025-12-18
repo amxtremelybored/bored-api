@@ -556,6 +556,14 @@ public class ContentFeedService {
     // ---------------------------------------------------------
     // 3) "Empty feed" meta for logged-in users (prefs + topics)
     // ---------------------------------------------------------
+    public List<ContentItemResponse> fetchSimpleRandom(int size) {
+        Pageable pageable = PageRequest.of(0, size);
+        List<TopicContent> contents = topicContentRepository.findRandom(pageable);
+        return contents.stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     public ContentEmptyMetaResponse buildEmptyMetaForCurrentUser(ContentFetchRequest request) {
         UserProfile profile = getCurrentUserProfile();
 
