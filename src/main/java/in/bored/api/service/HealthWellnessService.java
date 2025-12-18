@@ -35,63 +35,57 @@ public class HealthWellnessService {
     }
 
     @Transactional
-    public HealthWellnessContent getNextTip(Long userProfileId, String topic) {
+    public List<HealthWellnessContent> getNextTips(Long userProfileId, String topic, int count) {
         Optional<HealthWellnessCategory> categoryOpt = categoryRepository.findByName(topic);
         if (categoryOpt.isEmpty()) {
             logger.warn("Category not found: {}", topic);
-            return null;
+            return List.of();
         }
 
         HealthWellnessCategory category = categoryOpt.get();
 
         // 1. Try to find unseen content in DB
-        Optional<HealthWellnessContent> existing = contentRepository.findRandomUnseen(userProfileId, category.getId());
-        if (existing.isPresent()) {
-            markAsViewed(userProfileId, existing.get().getId(), null);
-            return existing.get();
-        }
+        List<HealthWellnessContent> existing = contentRepository.findRandomUnseen(userProfileId, category.getId(),
+                count);
 
-        // 2. If no content, generate via Gemini
-        logger.info("No existing health/wellness content for user {} in category {}. Generating...", userProfileId,
-                topic);
-        List<String> newTips = geminiService.generateHealthWellnessTip(topic, 5);
+        // 2. If not enough content, generate via Gemini
+        if (existing.size() < count) {
+            int needed = count - existing.size();
+            logger.info(
+                    "Not enough existing content (found {}), generating {} more via Gemini for user {} in category {}",
+                    existing.size(), needed, userProfileId, topic);
 
-        if (newTips.isEmpty()) {
-            return null;
-        }
+            // Ask for a bit more to handle potential duplicates
+            List<String> newTips = geminiService.generateHealthWellnessTip(topic, Math.max(5, needed));
 
-        // 3. Save new content
-        for (String tipText : newTips) {
-            // Check for duplicates
-            Optional<HealthWellnessContent> existingTip = contentRepository.findByTip(tipText);
-            if (existingTip.isPresent()) {
-                continue;
+            if (!newTips.isEmpty()) {
+                // 3. Save new content
+                for (String tipText : newTips) {
+                    // Check for duplicates
+                    Optional<HealthWellnessContent> existingTip = contentRepository.findByTip(tipText);
+                    if (existingTip.isPresent()) {
+                        // If it's a dry run, we might want to use it if we haven't seen it?
+                        // But findRandomUnseen should catch it on next pass.
+                        continue;
+                    }
+                    HealthWellnessContent content = new HealthWellnessContent();
+                    content.setCategory(category);
+                    content.setTip(tipText);
+                    content.setSource("Gemini");
+                    contentRepository.save(content);
+                }
+
+                // 4. Re-fetch to get the new ones (and any missed ones)
+                existing = contentRepository.findRandomUnseen(userProfileId, category.getId(), count);
             }
-            HealthWellnessContent content = new HealthWellnessContent();
-            content.setCategory(category);
-            content.setTip(tipText);
-            content.setSource("Gemini");
-            contentRepository.save(content);
         }
 
-        // 4. Return one of the new items (the first one)
-        HealthWellnessContent finalContent;
-        if (newTips != null && !newTips.isEmpty()) {
-            // We need to fetch the saved one to get the ID, or loop through saved ones.
-            // Best to just re-query or iterate the saved entities if we returned them.
-            // Since we didn't return them from save, let's re-query.
-            Optional<HealthWellnessContent> reFetched = contentRepository.findRandomUnseen(userProfileId,
-                    category.getId());
-            if (reFetched.isEmpty()) {
-                return null;
-            }
-            finalContent = reFetched.get();
-        } else {
-            return null;
+        // 5. Mark as viewed
+        for (HealthWellnessContent content : existing) {
+            markAsViewed(userProfileId, content.getId(), null);
         }
 
-        markAsViewed(userProfileId, finalContent.getId(), null);
-        return finalContent;
+        return existing;
     }
 
     @Transactional

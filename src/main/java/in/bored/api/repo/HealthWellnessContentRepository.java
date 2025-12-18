@@ -17,10 +17,11 @@ public interface HealthWellnessContentRepository extends ListCrudRepository<Heal
                 LEFT JOIN UserHealthWellnessView v ON c.id = v.healthWellnessContentId AND v.userProfileId = :userId
                 WHERE c.category.id = :categoryId AND v.id IS NULL
                 ORDER BY RANDOM()
-                LIMIT 1
+                ORDER BY RANDOM()
+                LIMIT :limit
             """)
-    Optional<HealthWellnessContent> findRandomUnseen(@Param("userId") Long userId,
-            @Param("categoryId") UUID categoryId);
+    java.util.List<HealthWellnessContent> findRandomUnseen(@Param("userId") Long userId,
+            @Param("categoryId") UUID categoryId, @Param("limit") int limit);
 
     Optional<HealthWellnessContent> findByTip(String tip);
 }

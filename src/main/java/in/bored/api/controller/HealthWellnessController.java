@@ -25,11 +25,13 @@ public class HealthWellnessController {
     }
 
     @GetMapping("/next")
-    public ResponseEntity<?> getNextTip(Authentication authentication, @RequestParam String topic) {
+    public ResponseEntity<?> getNextTips(Authentication authentication, @RequestParam String topic,
+            @RequestParam(defaultValue = "10") int count) {
         try {
             UserProfile user = userProfileService.getCurrentUserProfile();
-            HealthWellnessContent content = healthWellnessService.getNextTip(user.getId(), topic);
-            if (content == null) {
+            java.util.List<HealthWellnessContent> content = healthWellnessService.getNextTips(user.getId(), topic,
+                    count);
+            if (content.isEmpty()) {
                 return ResponseEntity.noContent().build();
             }
             return ResponseEntity.ok(content);
