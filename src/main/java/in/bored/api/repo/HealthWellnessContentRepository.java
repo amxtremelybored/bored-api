@@ -17,7 +17,6 @@ public interface HealthWellnessContentRepository extends ListCrudRepository<Heal
                 LEFT JOIN UserHealthWellnessView v ON c.id = v.healthWellnessContentId AND v.userProfileId = :userId
                 WHERE c.category.id = :categoryId AND v.id IS NULL
                 ORDER BY RANDOM()
-                ORDER BY RANDOM()
                 LIMIT :limit
             """)
     java.util.List<HealthWellnessContent> findRandomUnseen(@Param("userId") Long userId,
