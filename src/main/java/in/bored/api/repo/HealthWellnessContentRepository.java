@@ -21,4 +21,6 @@ public interface HealthWellnessContentRepository extends ListCrudRepository<Heal
             """)
     Optional<HealthWellnessContent> findRandomUnseen(@Param("userId") Long userId,
             @Param("categoryId") UUID categoryId);
+
+    Optional<HealthWellnessContent> findByTip(String tip);
 }

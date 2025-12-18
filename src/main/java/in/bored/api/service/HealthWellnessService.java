@@ -47,6 +47,7 @@ public class HealthWellnessService {
         // 1. Try to find unseen content in DB
         Optional<HealthWellnessContent> existing = contentRepository.findRandomUnseen(userProfileId, category.getId());
         if (existing.isPresent()) {
+            markAsViewed(userProfileId, existing.get().getId(), null);
             return existing.get();
         }
 
@@ -61,6 +62,11 @@ public class HealthWellnessService {
 
         // 3. Save new content
         for (String tipText : newTips) {
+            // Check for duplicates
+            Optional<HealthWellnessContent> existingTip = contentRepository.findByTip(tipText);
+            if (existingTip.isPresent()) {
+                continue;
+            }
             HealthWellnessContent content = new HealthWellnessContent();
             content.setCategory(category);
             content.setTip(tipText);
@@ -69,19 +75,23 @@ public class HealthWellnessService {
         }
 
         // 4. Return one of the new items (the first one)
-        // We need to fetch it again or just use the first saved one.
-        // Let's just return the first one we created.
-        HealthWellnessContent first = new HealthWellnessContent();
-        first.setCategory(category);
-        first.setTip(newTips.get(0));
-        first.setSource("Gemini");
-        // We need the ID to be set, so we should probably fetch the one we just saved
-        // or save and return.
-        // The loop above saves them. Let's find the one we just saved.
-        // Actually, let's just return the first one from the loop but we need the ID
-        // for tracking view.
-        // So let's query again.
-        return contentRepository.findRandomUnseen(userProfileId, category.getId()).orElse(null);
+        HealthWellnessContent finalContent;
+        if (newTips != null && !newTips.isEmpty()) {
+            // We need to fetch the saved one to get the ID, or loop through saved ones.
+            // Best to just re-query or iterate the saved entities if we returned them.
+            // Since we didn't return them from save, let's re-query.
+            Optional<HealthWellnessContent> reFetched = contentRepository.findRandomUnseen(userProfileId,
+                    category.getId());
+            if (reFetched.isEmpty()) {
+                return null;
+            }
+            finalContent = reFetched.get();
+        } else {
+            return null;
+        }
+
+        markAsViewed(userProfileId, finalContent.getId(), null);
+        return finalContent;
     }
 
     @Transactional
