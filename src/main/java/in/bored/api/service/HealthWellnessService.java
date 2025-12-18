@@ -96,6 +96,9 @@ public class HealthWellnessService {
 
     @Transactional
     public void markAsViewed(Long userProfileId, Long contentId, Boolean isLiked) {
+        if (viewRepository.existsByUserProfileIdAndHealthWellnessContentId(userProfileId, contentId)) {
+            return;
+        }
         try {
             UserHealthWellnessView view = new UserHealthWellnessView(userProfileId, contentId, isLiked);
             viewRepository.save(view);

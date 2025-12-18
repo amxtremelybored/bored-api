@@ -136,4 +136,16 @@ public class HealthWellnessServiceTest {
         // Verify it was marked as viewed
         verify(viewRepository).save(any(UserHealthWellnessView.class));
     }
+
+    @Test
+    void markAsViewed_doesNothing_ifAlreadyViewed() {
+        Long userId = 1L;
+        Long contentId = 100L;
+
+        when(viewRepository.existsByUserProfileIdAndHealthWellnessContentId(userId, contentId)).thenReturn(true);
+
+        service.markAsViewed(userId, contentId, true);
+
+        verify(viewRepository, never()).save(any(UserHealthWellnessView.class));
+    }
 }
