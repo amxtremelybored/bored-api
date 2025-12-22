@@ -16746,3 +16746,5 @@ java.io.FileNotFoundException: stress-test/content_stress_test.jmx (No such file
 2025-12-18 15:53:11,815 INFO o.a.j.g.a.Start: Shutting test down
 2025-12-18 15:53:13,392 INFO o.a.j.g.a.Start: Stopping test
 2025-12-18 15:53:13,426 INFO o.a.j.t.JMeterThread: Stopping: Stress Test Users (10) 1-4050
+2025-12-18 16:13:27,124 INFO o.a.j.r.ResultCollector: Shutdown hook started
+2025-12-18 16:13:27,125 INFO o.a.j.r.ResultCollector: Shutdown hook ended
