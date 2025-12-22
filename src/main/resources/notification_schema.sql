@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS notification_content (
 
 -- Seed some initial config
 INSERT INTO app_config (config_key, config_value) VALUES ('NOTI_TIMES', '09:00,18:00') ON CONFLICT DO NOTHING;
+INSERT INTO app_config (config_key, config_value) VALUES ('TEST_INTERVAL_MINUTES', '5') ON CONFLICT DO NOTHING;
 
 -- Seed some sample notifications
 INSERT INTO notification_content (title, body) VALUES 
