@@ -142,3 +142,56 @@ alter table public.super_category
 alter table public.content_category
     add column parent_id uuid
         references public.super_category;
+
+
+-- Ad System Schema
+
+alter table public.user_profiles
+    add column state varchar(100),
+    add column gender varchar(50);
+
+create table public.ads (
+    id uuid default gen_random_uuid() primary key,
+    name varchar(255) not null,
+    ad_type varchar(50) not null check (ad_type in ('IMAGE', 'VIDEO', 'TEXT')),
+    image_url varchar(1024),
+    video_url varchar(1024),
+    text_content text,
+    cta_text varchar(100),
+    cta_url varchar(1024),
+    is_active boolean default true not null,
+    priority integer default 0 not null,
+    created_at timestamp with time zone default now() not null,
+    updated_at timestamp with time zone default now() not null
+);
+
+alter table public.ads
+    owner to postgres;
+
+create table public.ad_targeting_rules (
+    id uuid default gen_random_uuid() primary key,
+    ad_id uuid not null references public.ads(id) on delete cascade,
+    min_age integer,
+    max_age integer,
+    target_state varchar(100),
+    target_gender varchar(50),
+    ad_category varchar(100),
+    created_at timestamp with time zone default now() not null
+);
+
+alter table public.ad_targeting_rules
+    owner to postgres;
+
+create index ix_ad_targeting_ad_id
+    on public.ad_targeting_rules (ad_id);
+
+create table public.ad_impressions (
+    id bigserial primary key,
+    ad_id uuid not null references public.ads(id),
+    user_profile_id bigint references public.user_profiles(id),
+    viewed_at timestamp with time zone default now() not null
+);
+
+alter table public.ad_impressions
+    owner to postgres;
+
