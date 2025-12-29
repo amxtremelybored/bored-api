@@ -50,7 +50,41 @@ public class UserProfile {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
+    @Column(name = "state", length = 100)
+    private String state;
+
+    @Column(name = "gender", length = 50)
+    private String gender;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "subscription_type", length = 20) // Default handled by DB or init
+    private SubscriptionType subscriptionType = SubscriptionType.FREE;
+
     // -------- getters & setters --------
+
+    public SubscriptionType getSubscriptionType() {
+        return subscriptionType;
+    }
+
+    public void setSubscriptionType(SubscriptionType subscriptionType) {
+        this.subscriptionType = subscriptionType;
+    }
+
+    public String getState() {
+        return state;
+    }
+
+    public void setState(String state) {
+        this.state = state;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
+    }
 
     public Long getId() {
         return id;

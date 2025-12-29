@@ -148,7 +148,8 @@ alter table public.content_category
 
 alter table public.user_profiles
     add column state varchar(100),
-    add column gender varchar(50);
+    add column gender varchar(50),
+    add column subscription_type varchar(20) default 'FREE';
 
 create table public.ads (
     id uuid default gen_random_uuid() primary key,
