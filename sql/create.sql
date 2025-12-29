@@ -162,6 +162,7 @@ create table public.ads (
     cta_url varchar(1024),
     is_active boolean default true not null,
     priority integer default 0 not null,
+    duration_seconds integer default 5 not null,
     created_at timestamp with time zone default now() not null,
     updated_at timestamp with time zone default now() not null
 );
@@ -195,4 +196,10 @@ create table public.ad_impressions (
 
 alter table public.ad_impressions
     owner to postgres;
+
+-- Migration for existing databases:
+-- ALTER TABLE public.ads ADD COLUMN duration_seconds integer DEFAULT 5 NOT NULL;
+
+-- Seed AD_INTERVAL
+INSERT INTO public.app_config (config_key, config_value) VALUES ('AD_INTERVAL', '5') ON CONFLICT (config_key) DO NOTHING;
 

@@ -59,7 +59,8 @@ public class AdSystemTest {
         void testServeAd_NoRules() {
                 // Create an Ad with no rules
                 AdRequest adRequest = new AdRequest(
-                                "Test Ad", "IMAGE", "http://img.com", null, "Text", "Click", "http://url.com", true, 1);
+                                "Ad A", "IMAGE", "http://img.com/a.jpg", null, "Text", "Click", "http://url.com", true,
+                                10, 5);
                 AdResponse createdAd = adService.createAd(adRequest);
 
                 // Serve ad
@@ -75,7 +76,7 @@ public class AdSystemTest {
         void testServeAd_MatchingRule() {
                 AdRequest adRequest = new AdRequest(
                                 "Targeted Ad", "IMAGE", "http://img.com", null, "Text", "Click", "http://url.com", true,
-                                1);
+                                1, 5);
                 AdResponse createdAd = adService.createAd(adRequest);
 
                 // Add matching rule (Age 20-30, State CA)
@@ -92,7 +93,7 @@ public class AdSystemTest {
         void testServeAd_NonMatchingRule() {
                 AdRequest adRequest = new AdRequest(
                                 "Targeted Ad", "IMAGE", "http://img.com", null, "Text", "Click", "http://url.com", true,
-                                1);
+                                1, 5);
                 AdResponse createdAd = adService.createAd(adRequest);
 
                 // Add NON-matching rule (State NY)
@@ -108,7 +109,7 @@ public class AdSystemTest {
         void testServeAd_GenderMismatch() {
                 AdRequest adRequest = new AdRequest(
                                 "Gender Ad", "IMAGE", "http://img.com", null, "Text", "Click", "http://url.com", true,
-                                1);
+                                1, 5);
                 AdResponse createdAd = adService.createAd(adRequest);
 
                 // Target Female
@@ -124,7 +125,7 @@ public class AdSystemTest {
         void testServeAd_MultipleRules_OneMatches() {
                 AdRequest adRequest = new AdRequest(
                                 "Multi Rule Ad", "IMAGE", "http://img.com", null, "Text", "Click", "http://url.com",
-                                true, 1);
+                                true, 1, 5);
                 AdResponse createdAd = adService.createAd(adRequest);
 
                 // Rule 1: Mismatch (NY)
@@ -146,12 +147,11 @@ public class AdSystemTest {
 
                 // Ad A: Prio 1
                 AdResponse adA = adService.createAd(new AdRequest(
-                                "Ad A", "IMAGE", null, null, null, null, null, true, 1));
+                                "Ad A", "IMAGE", null, null, null, null, null, true, 1, 5));
 
                 // Ad B: Prio 99
                 AdResponse adB = adService.createAd(new AdRequest(
-                                "Ad B", "IMAGE", null, null, null, null, null, true, 99));
-
+                                "Ad B", "IMAGE", null, null, null, null, null, true, 99, 5));
                 int countA = 0;
                 int countB = 0;
                 int runs = 1000;
@@ -175,7 +175,7 @@ public class AdSystemTest {
         @Test
         void testSubscriptionLogic() {
                 AdRequest adRequest = new AdRequest(
-                                "Ad Free Only", "IMAGE", null, null, null, null, null, true, 1);
+                                "Ad Male OR CA", "IMAGE", null, null, null, null, null, true, 10, 5);
                 adService.createAd(adRequest);
 
                 // FREE user (default setup)

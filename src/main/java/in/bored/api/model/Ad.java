@@ -43,6 +43,9 @@ public class Ad {
     @Column(name = "priority", nullable = false)
     private int priority = 0;
 
+    @Column(name = "duration_seconds")
+    private Integer durationSeconds; // How long to show the ad (in seconds)
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -147,5 +150,13 @@ public class Ad {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Integer getDurationSeconds() {
+        return durationSeconds;
+    }
+
+    public void setDurationSeconds(Integer durationSeconds) {
+        this.durationSeconds = durationSeconds;
     }
 }

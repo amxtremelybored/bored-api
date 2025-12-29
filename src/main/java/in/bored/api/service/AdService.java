@@ -227,10 +227,12 @@ public class AdService {
         ad.setTextContent(request.textContent());
         ad.setCtaText(request.ctaText());
         ad.setCtaUrl(request.ctaUrl());
-        if (request.isActive() != null)
+        if (request.isActive()) // primitive, implies non-null in record if not wrapper
             ad.setActive(request.isActive());
-        if (request.priority() != null)
+        if (request.priority() != 0) // assumption: 0 is default/no-change, or we should use Integer in record
             ad.setPriority(request.priority());
+        if (request.durationSeconds() != null)
+            ad.setDurationSeconds(request.durationSeconds());
     }
 
     private AdResponse mapToAdResponse(Ad ad) {
@@ -243,6 +245,7 @@ public class AdService {
                 ad.getTextContent(),
                 ad.getCtaText(),
                 ad.getCtaUrl(),
+                ad.getDurationSeconds(),
                 ad.isActive(),
                 ad.getPriority(),
                 ad.getCreatedAt(),
