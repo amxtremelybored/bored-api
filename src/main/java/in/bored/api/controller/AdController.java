@@ -80,4 +80,21 @@ public class AdController {
         }
         return ResponseEntity.ok(ad);
     }
+
+    // DEBUG: List files in ad media directory
+    @GetMapping("/debug-files")
+    public ResponseEntity<java.util.List<String>> listFiles() {
+        java.io.File folder = new java.io.File("/home/bored/ad/");
+        java.io.File[] listOfFiles = folder.listFiles();
+        java.util.List<String> files = new java.util.ArrayList<>();
+
+        if (listOfFiles != null) {
+            for (java.io.File file : listOfFiles) {
+                files.add(file.getName() + (file.isDirectory() ? "/" : "") + " (" + file.length() + " bytes)");
+            }
+        } else {
+            files.add("Directory does not exist or IO error");
+        }
+        return ResponseEntity.ok(files);
+    }
 }
