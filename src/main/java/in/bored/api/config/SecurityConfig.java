@@ -17,43 +17,44 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    // ✅ Only Firebase filter now – no TenantSchemaFilter
-    private final FirebaseAuthenticationFilter firebaseAuthFilter;
+        // ✅ Only Firebase filter now – no TenantSchemaFilter
+        private final FirebaseAuthenticationFilter firebaseAuthFilter;
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-                .csrf(csrf -> csrf.disable())
-                .httpBasic(httpBasic -> httpBasic.disable())
-                .formLogin(form -> form.disable())
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/actuator/**",
-                                "/v3/api-docs/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html",
-                                "/error")
-                        .permitAll()
+        @Bean
+        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+                http
+                                .csrf(csrf -> csrf.disable())
+                                .httpBasic(httpBasic -> httpBasic.disable())
+                                .formLogin(form -> form.disable())
+                                .authorizeHttpRequests(auth -> auth
+                                                .requestMatchers(
+                                                                "/actuator/**",
+                                                                "/v3/api-docs/**",
+                                                                "/swagger-ui/**",
+                                                                "/swagger-ui.html",
+                                                                "/error",
+                                                                "/media/**")
+                                                .permitAll()
 
-                        // 🆓 GUEST endpoint → no auth required
-                        // 🆓 GUEST endpoints → no auth required (or optional auth)
-                        .requestMatchers(
-                                "/api/content/guest-next",
-                                "/api/content/guest-topic-next",
-                                "/api/content/next" // Unified endpoint (smart handling)
-                        ).permitAll()
+                                                // 🆓 GUEST endpoint → no auth required
+                                                // 🆓 GUEST endpoints → no auth required (or optional auth)
+                                                .requestMatchers(
+                                                                "/api/content/guest-next",
+                                                                "/api/content/guest-topic-next",
+                                                                "/api/content/next" // Unified endpoint (smart handling)
+                                                ).permitAll()
 
-                        // everything else requires Firebase auth
-                        .anyRequest().authenticated())
-                // ✅ Authenticate Firebase token before Spring's
-                // UsernamePasswordAuthenticationFilter
-                .addFilterBefore(firebaseAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                                                // everything else requires Firebase auth
+                                                .anyRequest().authenticated())
+                                // ✅ Authenticate Firebase token before Spring's
+                                // UsernamePasswordAuthenticationFilter
+                                .addFilterBefore(firebaseAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-        return http.build();
-    }
+                return http.build();
+        }
 
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
-    }
+        @Bean
+        public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+                return config.getAuthenticationManager();
+        }
 }
