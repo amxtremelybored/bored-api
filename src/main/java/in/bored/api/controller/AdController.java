@@ -13,9 +13,11 @@ import java.util.UUID;
 public class AdController {
 
     private final AdService adService;
+    private final in.bored.api.service.UserProfileService userProfileService;
 
-    public AdController(AdService adService) {
+    public AdController(AdService adService, in.bored.api.service.UserProfileService userProfileService) {
         this.adService = adService;
+        this.userProfileService = userProfileService;
     }
 
     // --- Ad CRUD ---
@@ -68,8 +70,11 @@ public class AdController {
     // --- Serving ---
 
     @GetMapping("/serve")
-    public ResponseEntity<AdResponse> serveAd(@RequestParam Long userProfileId) {
-        AdResponse ad = adService.serveAd(userProfileId);
+    public ResponseEntity<AdResponse> serveAd() {
+        // Authenticated user resolution
+        in.bored.api.model.UserProfile currentUser = userProfileService.getCurrentUserProfile();
+
+        AdResponse ad = adService.serveAd(currentUser.getId());
         if (ad == null) {
             return ResponseEntity.noContent().build();
         }
