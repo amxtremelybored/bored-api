@@ -12,5 +12,7 @@ public record AdRequest(
                 String ctaUrl,
                 boolean isActive,
                 int priority,
-                Integer durationSeconds) {
+                Integer durationSeconds,
+                String displayFormat,
+                java.util.List<Long> slotIds) {
 }

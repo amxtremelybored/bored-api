@@ -163,6 +163,7 @@ create table public.ads (
     is_active boolean default true not null,
     priority integer default 0 not null,
     duration_seconds integer default 5 not null,
+    display_format varchar(20) default 'FULL_SCREEN',
     created_at timestamp with time zone default now() not null,
     updated_at timestamp with time zone default now() not null
 );
@@ -202,4 +203,26 @@ alter table public.ad_impressions
 
 -- Seed AD_INTERVAL
 INSERT INTO public.app_config (config_key, config_value) VALUES ('AD_INTERVAL', '5') ON CONFLICT (config_key) DO NOTHING;
+
+-- Migration for display_format
+-- ALTER TABLE public.ads ADD COLUMN display_format varchar(20) DEFAULT 'FULL_SCREEN';
+
+CREATE TABLE public.ad_slots (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL
+);
+
+CREATE TABLE public.ad_slot_mappings (
+    ad_id UUID NOT NULL REFERENCES public.ads(id) ON DELETE CASCADE,
+    slot_id INTEGER NOT NULL REFERENCES public.ad_slots(id) ON DELETE CASCADE,
+    PRIMARY KEY (ad_id, slot_id)
+);
+
+-- Seed Slot 1 (9 AM to 12 PM)
+INSERT INTO public.ad_slots (name, start_time, end_time) 
+VALUES ('Slot 1', '09:00:00', '12:00:00')
+ON CONFLICT DO NOTHING;
+
 

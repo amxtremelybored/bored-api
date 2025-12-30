@@ -120,7 +120,15 @@ public class AdService {
         List<Ad> activeAds = adRepository.findByIsActiveTrue();
         List<Ad> eligibleAds = new ArrayList<>();
 
+        // Use India Standard Time (IST)
+        java.time.LocalTime now = java.time.LocalTime.now(java.time.ZoneId.of("Asia/Kolkata"));
+
         for (Ad ad : activeAds) {
+            // Check Time Slots
+            if (!isEligibleForTimeSlot(ad, now)) {
+                continue;
+            }
+
             List<AdTargetingRule> rules = ruleRepository.findByAdId(ad.getId());
             if (isEligible(user, rules)) {
                 eligibleAds.add(ad);
@@ -131,93 +139,71 @@ public class AdService {
             return null; // No ad available
         }
 
-        // Weighted random selection: Lower priority value = Higher frequency (1 > 99)
-        // Formula: Weight = 1000.0 / (Priority + 1)
-        // Prio 0 -> Weight 1000
-        // Prio 1 -> Weight 500
-        // Prio 99 -> Weight 10 (Prio 1 shows 50x more often than Prio 99)
+        // Strict Priority Logic:
+        // 1. Find the best (lowest value) priority among eligible ads.
+        // Assuming Logic: Priority 1 is "Higher" than Priority 10.
+        // Default 0 will be treated as highest if present.
+        int bestPriority = eligibleAds.stream()
+                .mapToInt(Ad::getPriority)
+                .min()
+                .orElse(Integer.MAX_VALUE);
 
-        double totalWeight = 0;
-        for (Ad ad : eligibleAds) {
-            totalWeight += getAdWeight(ad);
-        }
+        // 2. Filter to only get ads with that priority
+        List<Ad> bestAds = eligibleAds.stream()
+                .filter(ad -> ad.getPriority() == bestPriority)
+                .collect(Collectors.toList());
 
-        double randomValue = random.nextDouble() * totalWeight;
-        Ad selectedAd = null;
-        for (Ad ad : eligibleAds) {
-            randomValue -= getAdWeight(ad);
-            if (randomValue <= 0) {
-                selectedAd = ad;
-                break;
-            }
-        }
+        // 3. Split equally (Random Uniform Selection)
+        Ad selectedAd = bestAds.get(random.nextInt(bestAds.size()));
 
-        // Fallback (should theoretically not happen if totalWeight > 0)
-        if (selectedAd == null) {
-            selectedAd = eligibleAds.get(eligibleAds.size() - 1);
-        }
-
-        // Record impression
         recordImpression(userProfileId, selectedAd.getId());
-
         return mapToAdResponse(selectedAd);
     }
 
-    private double getAdWeight(Ad ad) {
-        // Ensure non-negative; treat 0 as highest priority
-        int prio = Math.max(0, ad.getPriority());
-        return 1000.0 / (prio + 1.0);
+    private boolean isEligibleForTimeSlot(Ad ad, java.time.LocalTime now) {
+        if (ad.getSlots() == null || ad.getSlots().isEmpty()) {
+            return true; // No slots assigned -> Show 24/7
+        }
+        for (AdSlot slot : ad.getSlots()) {
+            if (now.isAfter(slot.getStartTime()) && now.isBefore(slot.getEndTime())) {
+                return true; // Current time is within a slot
+            }
+            // Handle cross-midnight slots if necessary (e.g. 23:00 to 02:00)
+            // Assuming simple start < end for now as per requirement (9 to 12)
+        }
+        return false;
     }
 
     private boolean isEligible(UserProfile user, List<AdTargetingRule> rules) {
-        if (rules.isEmpty()) {
-            return true; // No rules, valid for everyone
-        }
-
-        // Must match ALL non-null criteria in AT LEAST ONE rule?
-        // Usually, multiple rules for an Ad are OR conditions (e.g. Target CA OR Target
-        // NY).
-        // Let's assume rules are alternative criteria sets.
-        // If an ad has 2 rules, either rule being satisfied makes it eligible.
-
+        if (rules.isEmpty())
+            return true;
         for (AdTargetingRule rule : rules) {
-            if (matchesRule(user, rule)) {
+            if (matchesRule(user, rule))
                 return true;
-            }
         }
         return false;
     }
 
     private boolean matchesRule(UserProfile user, AdTargetingRule rule) {
-        // Age check
-        if (rule.getMinAge() != null && (user.getAge() == null || user.getAge() < rule.getMinAge())) {
+        if (rule.getMinAge() != null && (user.getAge() == null || user.getAge() < rule.getMinAge()))
             return false;
-        }
-        if (rule.getMaxAge() != null && (user.getAge() == null || user.getAge() > rule.getMaxAge())) {
+        if (rule.getMaxAge() != null && (user.getAge() == null || user.getAge() > rule.getMaxAge()))
             return false;
-        }
-
-        // State check
         if (rule.getTargetState() != null
-                && (user.getState() == null || !rule.getTargetState().equalsIgnoreCase(user.getState()))) {
+                && (user.getState() == null || !rule.getTargetState().equalsIgnoreCase(user.getState())))
             return false;
-        }
-
-        // Gender check
         if (rule.getTargetGender() != null
-                && (user.getGender() == null || !rule.getTargetGender().equalsIgnoreCase(user.getGender()))) {
+                && (user.getGender() == null || !rule.getTargetGender().equalsIgnoreCase(user.getGender())))
             return false;
-        }
-
         return true;
     }
 
-    // --- Helpers ---
-
     private Ad findAd(UUID id) {
-        return adRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Ad not found"));
+        return adRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("Ad not found"));
     }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private AdSlotRepository adSlotRepository;
 
     private void updateAdFromRequest(Ad ad, AdRequest request) {
         ad.setName(request.name());
@@ -227,12 +213,19 @@ public class AdService {
         ad.setTextContent(request.textContent());
         ad.setCtaText(request.ctaText());
         ad.setCtaUrl(request.ctaUrl());
-        if (request.isActive()) // primitive, implies non-null in record if not wrapper
+        if (request.isActive())
             ad.setActive(request.isActive());
-        if (request.priority() != 0) // assumption: 0 is default/no-change, or we should use Integer in record
+        if (request.priority() != 0)
             ad.setPriority(request.priority());
         if (request.durationSeconds() != null)
             ad.setDurationSeconds(request.durationSeconds());
+        if (request.displayFormat() != null)
+            ad.setDisplayFormat(request.displayFormat());
+
+        if (request.slotIds() != null) {
+            java.util.Set<AdSlot> slots = new java.util.HashSet<>(adSlotRepository.findAllById(request.slotIds()));
+            ad.setSlots(slots);
+        }
     }
 
     private AdResponse mapToAdResponse(Ad ad) {
@@ -246,6 +239,8 @@ public class AdService {
                 ad.getCtaText(),
                 ad.getCtaUrl(),
                 ad.getDurationSeconds(),
+                ad.getDisplayFormat(),
+                ad.getSlots().stream().map(AdSlot::getName).collect(Collectors.toList()),
                 ad.isActive(),
                 ad.getPriority(),
                 ad.getCreatedAt(),

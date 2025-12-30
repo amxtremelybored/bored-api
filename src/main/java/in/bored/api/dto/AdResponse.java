@@ -13,6 +13,8 @@ public record AdResponse(
                 String ctaText,
                 String ctaUrl,
                 Integer durationSeconds,
+                String displayFormat,
+                java.util.List<String> slotNames,
                 boolean isActive,
                 int priority,
                 OffsetDateTime createdAt,

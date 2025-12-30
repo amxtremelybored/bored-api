@@ -46,6 +46,9 @@ public class Ad {
     @Column(name = "duration_seconds")
     private Integer durationSeconds; // How long to show the ad (in seconds)
 
+    @Column(name = "display_format", length = 20)
+    private String displayFormat = "FULL_SCREEN"; // FULL_SCREEN, HALF_SCREEN
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -53,6 +56,10 @@ public class Ad {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(name = "ad_slot_mappings", joinColumns = @JoinColumn(name = "ad_id"), inverseJoinColumns = @JoinColumn(name = "slot_id"))
+    private java.util.Set<AdSlot> slots = new java.util.HashSet<>();
 
     // Getters and Setters
 
@@ -158,5 +165,21 @@ public class Ad {
 
     public void setDurationSeconds(Integer durationSeconds) {
         this.durationSeconds = durationSeconds;
+    }
+
+    public String getDisplayFormat() {
+        return displayFormat;
+    }
+
+    public void setDisplayFormat(String displayFormat) {
+        this.displayFormat = displayFormat;
+    }
+
+    public java.util.Set<AdSlot> getSlots() {
+        return slots;
+    }
+
+    public void setSlots(java.util.Set<AdSlot> slots) {
+        this.slots = slots;
     }
 }
