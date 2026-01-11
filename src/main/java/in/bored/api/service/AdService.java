@@ -124,6 +124,16 @@ public class AdService {
             return null;
         }
 
+        // Check Cooldown from Bulk Ads
+        OffsetDateTime lastShown = user.getLastBulkAdShownTime();
+        if (lastShown != null) {
+            java.time.Duration timeSince = java.time.Duration.between(lastShown, java.time.OffsetDateTime.now());
+            if (timeSince.toMinutes() < 60) {
+                // Cooldown active: Do NOT show regular ads either
+                return null;
+            }
+        }
+
         List<Ad> activeAds = adRepository.findByIsActiveTrue();
         List<Ad> eligibleAds = filterEligibleAds(user, activeAds);
 
