@@ -223,6 +223,13 @@ CREATE TABLE public.ad_slot_mappings (
 -- Seed Slot 1 (9 AM to 12 PM)
 INSERT INTO public.ad_slots (name, start_time, end_time) 
 VALUES ('Slot 1', '09:00:00', '12:00:00')
+
+-- Seed Slot 2 (12 PM to 4 PM)
+INSERT INTO public.ad_slots (name, start_time, end_time) 
+VALUES ('Slot 2', '12:00:00', '16:00:00')
 ON CONFLICT DO NOTHING;
 
-
+-- Seed Targeting Rule for user supplied ad c058d243-a6e0-45be-bf75-457efcf1cab1
+-- Targeting CA users aged 18-50
+INSERT INTO public.ad_targeting_rules (ad_id, min_age, max_age, target_state, ad_category)
+VALUES ('c058d243-a6e0-45be-bf75-457efcf1cab1', 18, 50, 'CA', 'General');

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.time.OffsetDateTime;
 
 @Service
 public class AdService {
@@ -20,16 +21,19 @@ public class AdService {
     private final AdTargetingRuleRepository ruleRepository;
     private final AdImpressionRepository impressionRepository;
     private final UserProfileRepository userProfileRepository;
+    private final BulkAdItemRepository bulkAdItemRepository;
     private final Random random = new Random();
 
     public AdService(AdRepository adRepository,
             AdTargetingRuleRepository ruleRepository,
             AdImpressionRepository impressionRepository,
-            UserProfileRepository userProfileRepository) {
+            UserProfileRepository userProfileRepository,
+            BulkAdItemRepository bulkAdItemRepository) {
         this.adRepository = adRepository;
         this.ruleRepository = ruleRepository;
         this.impressionRepository = impressionRepository;
         this.userProfileRepository = userProfileRepository;
+        this.bulkAdItemRepository = bulkAdItemRepository;
     }
 
     // --- Ad CRUD ---
@@ -111,29 +115,17 @@ public class AdService {
     public AdResponse serveAd(Long userProfileId) {
         UserProfile user = userProfileRepository.findById(userProfileId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
+        return serveAdInternal(user);
+    }
 
+    private AdResponse serveAdInternal(UserProfile user) {
         // Only show ads to FREE users
         if (user.getSubscriptionType() != SubscriptionType.FREE) {
             return null;
         }
 
         List<Ad> activeAds = adRepository.findByIsActiveTrue();
-        List<Ad> eligibleAds = new ArrayList<>();
-
-        // Use India Standard Time (IST)
-        java.time.LocalTime now = java.time.LocalTime.now(java.time.ZoneId.of("Asia/Kolkata"));
-
-        for (Ad ad : activeAds) {
-            // Check Time Slots
-            if (!isEligibleForTimeSlot(ad, now)) {
-                continue;
-            }
-
-            List<AdTargetingRule> rules = ruleRepository.findByAdId(ad.getId());
-            if (isEligible(user, rules)) {
-                eligibleAds.add(ad);
-            }
-        }
+        List<Ad> eligibleAds = filterEligibleAds(user, activeAds);
 
         if (eligibleAds.isEmpty()) {
             return null; // No ad available
@@ -141,8 +133,6 @@ public class AdService {
 
         // Strict Priority Logic:
         // 1. Find the best (lowest value) priority among eligible ads.
-        // Assuming Logic: Priority 1 is "Higher" than Priority 10.
-        // Default 0 will be treated as highest if present.
         int bestPriority = eligibleAds.stream()
                 .mapToInt(Ad::getPriority)
                 .min()
@@ -156,8 +146,83 @@ public class AdService {
         // 3. Split equally (Random Uniform Selection)
         Ad selectedAd = bestAds.get(random.nextInt(bestAds.size()));
 
-        recordImpression(userProfileId, selectedAd.getId());
+        recordImpression(user.getId(), selectedAd.getId());
         return mapToAdResponse(selectedAd);
+    }
+
+    @Transactional
+    public List<AdResponse> serveBulkAds(Long userProfileId) {
+        UserProfile user = userProfileRepository.findById(userProfileId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+
+        if (user.getSubscriptionType() != SubscriptionType.FREE) {
+            return new ArrayList<>();
+        }
+
+        // Check Cooldown
+        OffsetDateTime lastShown = user.getLastBulkAdShownTime();
+        if (lastShown != null) {
+            java.time.Duration timeSince = java.time.Duration.between(lastShown, java.time.OffsetDateTime.now());
+            if (timeSince.toMinutes() < 60) {
+                // Cooldown active: Serve single normal ad
+                AdResponse singleAd = serveAdInternal(user);
+                return singleAd != null ? List.of(singleAd) : new ArrayList<>();
+            }
+        }
+
+        // Serve Bulk
+        List<BulkAdItem> bulkItems = bulkAdItemRepository.findByIsActiveTrueOrderBySortOrderAsc();
+        if (bulkItems.isEmpty()) {
+            // Fallback if no bulk items configured
+            AdResponse singleAd = serveAdInternal(user);
+            return singleAd != null ? List.of(singleAd) : new ArrayList<>();
+        }
+
+        List<AdResponse> result = new ArrayList<>();
+        java.time.LocalTime now = java.time.LocalTime.now(java.time.ZoneId.of("Asia/Kolkata"));
+
+        for (BulkAdItem item : bulkItems) {
+            Ad ad = item.getAd();
+            if (!ad.isActive())
+                continue;
+
+            // Check Time Slots
+            if (!isEligibleForTimeSlot(ad, now))
+                continue;
+
+            List<AdTargetingRule> rules = ruleRepository.findByAdId(ad.getId());
+            if (isEligible(user, rules)) {
+                recordImpression(user.getId(), ad.getId());
+                result.add(mapToAdResponse(ad));
+            }
+        }
+
+        if (result.isEmpty()) {
+            // If filters removed all bulk ads, fallback to single normal ad
+            AdResponse singleAd = serveAdInternal(user);
+            return singleAd != null ? List.of(singleAd) : new ArrayList<>();
+        }
+
+        // Update User Cooldown
+        user.setLastBulkAdShownTime(java.time.OffsetDateTime.now());
+        userProfileRepository.save(user);
+
+        return result;
+    }
+
+    private List<Ad> filterEligibleAds(UserProfile user, List<Ad> sourceAds) {
+        List<Ad> eligible = new ArrayList<>();
+        java.time.LocalTime now = java.time.LocalTime.now(java.time.ZoneId.of("Asia/Kolkata"));
+
+        for (Ad ad : sourceAds) {
+            if (!isEligibleForTimeSlot(ad, now))
+                continue;
+            List<AdTargetingRule> rules = ruleRepository.findByAdId(ad.getId());
+            if (isEligible(user, rules)) {
+                eligible.add(ad);
+            }
+        }
+        return eligible;
     }
 
     private boolean isEligibleForTimeSlot(Ad ad, java.time.LocalTime now) {
@@ -185,16 +250,22 @@ public class AdService {
     }
 
     private boolean matchesRule(UserProfile user, AdTargetingRule rule) {
-        if (rule.getMinAge() != null && (user.getAge() == null || user.getAge() < rule.getMinAge()))
+        // Age check: Only fail if user age is KNOWN and out of range
+        if (rule.getMinAge() != null && user.getAge() != null && user.getAge() < rule.getMinAge())
             return false;
-        if (rule.getMaxAge() != null && (user.getAge() == null || user.getAge() > rule.getMaxAge()))
+        if (rule.getMaxAge() != null && user.getAge() != null && user.getAge() > rule.getMaxAge())
             return false;
+
+        // State check: Only fail if user state is KNOWN and does not match
         if (rule.getTargetState() != null
-                && (user.getState() == null || !rule.getTargetState().equalsIgnoreCase(user.getState())))
+                && user.getState() != null && !rule.getTargetState().equalsIgnoreCase(user.getState()))
             return false;
+
+        // Gender check: Only fail if user gender is KNOWN and does not match
         if (rule.getTargetGender() != null
-                && (user.getGender() == null || !rule.getTargetGender().equalsIgnoreCase(user.getGender())))
+                && user.getGender() != null && !rule.getTargetGender().equalsIgnoreCase(user.getGender()))
             return false;
+
         return true;
     }
 

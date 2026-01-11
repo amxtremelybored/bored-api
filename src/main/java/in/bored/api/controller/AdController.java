@@ -81,6 +81,19 @@ public class AdController {
         return ResponseEntity.ok(ad);
     }
 
+    @GetMapping("/bulk")
+    public ResponseEntity<List<AdResponse>> getBulkAds() {
+        // Authenticated user resolution
+        in.bored.api.model.UserProfile currentUser = userProfileService.getCurrentUserProfile();
+
+        List<AdResponse> ads = adService.serveBulkAds(currentUser.getId());
+        if (ads.isEmpty()) {
+            // Depending on requirement, we might return empty list or specific status.
+            return ResponseEntity.ok(ads); // Return empty list
+        }
+        return ResponseEntity.ok(ads);
+    }
+
     // DEBUG: List files in ad media directory
     @GetMapping("/debug-files")
     public ResponseEntity<java.util.List<String>> listFiles() {

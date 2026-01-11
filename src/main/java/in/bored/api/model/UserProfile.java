@@ -60,6 +60,9 @@ public class UserProfile {
     @Column(name = "subscription_type", length = 20) // Default handled by DB or init
     private SubscriptionType subscriptionType = SubscriptionType.FREE;
 
+    @Column(name = "last_bulk_ad_shown_time")
+    private OffsetDateTime lastBulkAdShownTime;
+
     // -------- getters & setters --------
 
     public SubscriptionType getSubscriptionType() {
@@ -173,5 +176,13 @@ public class UserProfile {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public OffsetDateTime getLastBulkAdShownTime() {
+        return lastBulkAdShownTime;
+    }
+
+    public void setLastBulkAdShownTime(OffsetDateTime lastBulkAdShownTime) {
+        this.lastBulkAdShownTime = lastBulkAdShownTime;
     }
 }
