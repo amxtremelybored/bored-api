@@ -152,10 +152,12 @@ public class AdService {
 
     @Transactional
     public List<AdResponse> serveBulkAds(Long userProfileId) {
+        System.out.println("DEBUG: serveBulkAds called for user: " + userProfileId);
         UserProfile user = userProfileRepository.findById(userProfileId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
         if (user.getSubscriptionType() != SubscriptionType.FREE) {
+            System.out.println("DEBUG: User is not FREE, returning empty list");
             return new ArrayList<>();
         }
 
@@ -163,16 +165,24 @@ public class AdService {
         OffsetDateTime lastShown = user.getLastBulkAdShownTime();
         if (lastShown != null) {
             java.time.Duration timeSince = java.time.Duration.between(lastShown, java.time.OffsetDateTime.now());
+            System.out.println(
+                    "DEBUG: Last bulk ad shown at: " + lastShown + ", Minutes since: " + timeSince.toMinutes());
             if (timeSince.toMinutes() < 60) {
+                System.out.println("DEBUG: Cooldown ACTIVE. Serving fallback single ad.");
                 // Cooldown active: Serve single normal ad
                 AdResponse singleAd = serveAdInternal(user);
                 return singleAd != null ? List.of(singleAd) : new ArrayList<>();
             }
+        } else {
+            System.out.println("DEBUG: First time bulk ad for this user (lastShown is null)");
         }
 
         // Serve Bulk
         List<BulkAdItem> bulkItems = bulkAdItemRepository.findByIsActiveTrueOrderBySortOrderAsc();
+        System.out.println("DEBUG: Found " + bulkItems.size() + " active bulk items configured.");
+
         if (bulkItems.isEmpty()) {
+            System.out.println("DEBUG: No bulk items found in DB. Serving fallback.");
             // Fallback if no bulk items configured
             AdResponse singleAd = serveAdInternal(user);
             return singleAd != null ? List.of(singleAd) : new ArrayList<>();
@@ -183,27 +193,36 @@ public class AdService {
 
         for (BulkAdItem item : bulkItems) {
             Ad ad = item.getAd();
-            if (!ad.isActive())
+            if (!ad.isActive()) {
+                System.out.println("DEBUG: Ad " + ad.getId() + " is inactive, skipping.");
                 continue;
+            }
 
             // Check Time Slots
-            if (!isEligibleForTimeSlot(ad, now))
+            if (!isEligibleForTimeSlot(ad, now)) {
+                System.out.println("DEBUG: Ad " + ad.getId() + " not eligible for time slot " + now);
                 continue;
+            }
 
             List<AdTargetingRule> rules = ruleRepository.findByAdId(ad.getId());
             if (isEligible(user, rules)) {
+                System.out.println("DEBUG: Ad " + ad.getId() + " ELIGIBLE. Adding to result.");
                 recordImpression(user.getId(), ad.getId());
                 result.add(mapToAdResponse(ad));
+            } else {
+                System.out.println("DEBUG: Ad " + ad.getId() + " targeting mismatch.");
             }
         }
 
         if (result.isEmpty()) {
+            System.out.println("DEBUG: All bulk ads filtered out. Serving fallback.");
             // If filters removed all bulk ads, fallback to single normal ad
             AdResponse singleAd = serveAdInternal(user);
             return singleAd != null ? List.of(singleAd) : new ArrayList<>();
         }
 
         // Update User Cooldown
+        System.out.println("DEBUG: Successfully serving " + result.size() + " bulk ads. Updating lastBulkAdShownTime.");
         user.setLastBulkAdShownTime(java.time.OffsetDateTime.now());
         userProfileRepository.save(user);
 
