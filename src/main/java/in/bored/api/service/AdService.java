@@ -168,10 +168,8 @@ public class AdService {
             System.out.println(
                     "DEBUG: Last bulk ad shown at: " + lastShown + ", Minutes since: " + timeSince.toMinutes());
             if (timeSince.toMinutes() < 60) {
-                System.out.println("DEBUG: Cooldown ACTIVE. Serving fallback single ad.");
-                // Cooldown active: Serve single normal ad
-                AdResponse singleAd = serveAdInternal(user);
-                return singleAd != null ? List.of(singleAd) : new ArrayList<>();
+                System.out.println("DEBUG: Cooldown ACTIVE. Returning empty list.");
+                return new ArrayList<>();
             }
         } else {
             System.out.println("DEBUG: First time bulk ad for this user (lastShown is null)");
@@ -182,10 +180,8 @@ public class AdService {
         System.out.println("DEBUG: Found " + bulkItems.size() + " active bulk items configured.");
 
         if (bulkItems.isEmpty()) {
-            System.out.println("DEBUG: No bulk items found in DB. Serving fallback.");
-            // Fallback if no bulk items configured
-            AdResponse singleAd = serveAdInternal(user);
-            return singleAd != null ? List.of(singleAd) : new ArrayList<>();
+            System.out.println("DEBUG: No bulk items found in DB. Returning empty list.");
+            return new ArrayList<>();
         }
 
         List<AdResponse> result = new ArrayList<>();
@@ -215,10 +211,8 @@ public class AdService {
         }
 
         if (result.isEmpty()) {
-            System.out.println("DEBUG: All bulk ads filtered out. Serving fallback.");
-            // If filters removed all bulk ads, fallback to single normal ad
-            AdResponse singleAd = serveAdInternal(user);
-            return singleAd != null ? List.of(singleAd) : new ArrayList<>();
+            System.out.println("DEBUG: All bulk ads filtered out. Returning empty list.");
+            return new ArrayList<>();
         }
 
         // Update User Cooldown
