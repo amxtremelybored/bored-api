@@ -232,7 +232,24 @@ public class ContentFeedService {
         }
 
         // 4) Save views (store topic too)
-        List<UserContentView> views = contents.stream()
+        // If includeViewed=true, some items might already be viewed. Filter those out.
+        // We only want to save NEW views.
+        List<TopicContent> newViewsToSave = new java.util.ArrayList<>();
+        if (request.getIncludeViewed() != null && request.getIncludeViewed()) {
+            for (TopicContent tc : contents) {
+                boolean alreadyViewed = userContentViewRepository
+                        .findByUserProfileAndTopicContent_Id(profile, tc.getId())
+                        .isPresent();
+                if (!alreadyViewed) {
+                    newViewsToSave.add(tc);
+                }
+            }
+        } else {
+            // Normal flow: query guaranteed unseen
+            newViewsToSave.addAll(contents);
+        }
+
+        List<UserContentView> views = newViewsToSave.stream()
                 .map(c -> {
                     UserContentView v = new UserContentView();
                     v.setUserProfile(profile);
