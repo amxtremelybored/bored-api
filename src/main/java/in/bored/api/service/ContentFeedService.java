@@ -141,8 +141,15 @@ public class ContentFeedService {
 
         Pageable pageable = PageRequest.of(0, size);
 
-        // 3) Unseen content
-        List<TopicContent> contents = topicContentRepository.findNextUnseenForUser(profile, topics, pageable);
+        // 3) Content Fetching
+        List<TopicContent> contents;
+        if (request.getIncludeViewed() != null && request.getIncludeViewed()) {
+            // Fetch ALL content for topic (Bookmarks Flow)
+            contents = topicContentRepository.findNextForUser(topics, pageable);
+        } else {
+            // Fetch UNSEEN content (Regular Feed Flow)
+            contents = topicContentRepository.findNextUnseenForUser(profile, topics, pageable);
+        }
 
         if (contents.isEmpty()) {
             // Fallback to Gemini if we have topics but no DB content

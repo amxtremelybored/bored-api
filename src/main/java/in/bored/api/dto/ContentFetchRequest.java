@@ -32,4 +32,14 @@ public class ContentFetchRequest {
     public void setRefreshTopic(Boolean refreshTopic) {
         this.refreshTopic = refreshTopic;
     }
+
+    private Boolean includeViewed;
+
+    public Boolean getIncludeViewed() {
+        return includeViewed;
+    }
+
+    public void setIncludeViewed(Boolean includeViewed) {
+        this.includeViewed = includeViewed;
+    }
 }

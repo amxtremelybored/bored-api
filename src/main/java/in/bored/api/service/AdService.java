@@ -234,7 +234,7 @@ public class AdService {
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
         System.out.println("DEBUG: Explicitly updating lastBulkAdShownTime for user " + userProfileId);
-        user.setLastBulkAdShownTime(java.time.OffsetDateTime.now());
+        user.setLastBulkAdShownTime(java.time.OffsetDateTime.now(java.time.ZoneId.of("Asia/Kolkata")));
         userProfileRepository.save(user);
     }
 
