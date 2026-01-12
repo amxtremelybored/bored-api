@@ -225,12 +225,17 @@ public class AdService {
             return new ArrayList<>();
         }
 
-        // Update User Cooldown
-        System.out.println("DEBUG: Successfully serving " + result.size() + " bulk ads. Updating lastBulkAdShownTime.");
+        return result;
+    }
+
+    @Transactional
+    public void recordBulkAdCooldown(Long userProfileId) {
+        UserProfile user = userProfileRepository.findById(userProfileId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+
+        System.out.println("DEBUG: Explicitly updating lastBulkAdShownTime for user " + userProfileId);
         user.setLastBulkAdShownTime(java.time.OffsetDateTime.now());
         userProfileRepository.save(user);
-
-        return result;
     }
 
     private List<Ad> filterEligibleAds(UserProfile user, List<Ad> sourceAds) {

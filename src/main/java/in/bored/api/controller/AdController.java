@@ -94,6 +94,15 @@ public class AdController {
         return ResponseEntity.ok(ads);
     }
 
+    @PostMapping("/bulk/complete")
+    public ResponseEntity<Void> completeBulkAds() {
+        // Authenticated user resolution
+        in.bored.api.model.UserProfile currentUser = userProfileService.getCurrentUserProfile();
+
+        adService.recordBulkAdCooldown(currentUser.getId());
+        return ResponseEntity.ok().build();
+    }
+
     // DEBUG: List files in ad media directory
     @GetMapping("/debug-files")
     public ResponseEntity<java.util.List<String>> listFiles() {
