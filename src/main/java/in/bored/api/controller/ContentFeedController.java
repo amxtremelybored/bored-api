@@ -14,8 +14,11 @@ import java.util.List;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import lombok.extern.slf4j.Slf4j;
+
 @RestController
 @RequestMapping("/api/content")
+@Slf4j
 public class ContentFeedController {
 
         private final ContentFeedService contentFeedService;
@@ -28,6 +31,7 @@ public class ContentFeedController {
         @PostMapping("/next")
         public ResponseEntity<List<ContentItemResponse>> getNextContent(
                         @RequestBody(required = false) ContentFetchRequest request) {
+                log.info("Request received: POST /api/content/next");
 
                 // Check if user is authenticated
                 org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder
@@ -64,6 +68,7 @@ public class ContentFeedController {
         @PostMapping("/topic-next")
         public ResponseEntity<TopicSummary> getNextTopic(
                         @RequestBody(required = false) java.util.Map<String, Object> payload) {
+                log.info("Request received: POST /api/content/topic-next");
                 Long currentTopicId = null;
                 if (payload != null && payload.containsKey("currentTopicId")) {
                         Object val = payload.get("currentTopicId");
@@ -87,6 +92,7 @@ public class ContentFeedController {
         @PostMapping("/guest-next")
         public ResponseEntity<List<ContentItemResponse>> getGuestContent(
                         @RequestBody(required = false) GuestContentFetchRequest request) {
+                log.info("Request received: POST /api/content/guest-next");
 
                 // Extract UID from header if present
                 org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder

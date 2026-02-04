@@ -19,6 +19,7 @@ public class PuzzleController {
 
     @GetMapping("/next")
     public ResponseEntity<java.util.List<QuizResponse>> getNextPuzzle(@RequestParam(defaultValue = "10") int size) {
+        log.info("Request received: GET /api/puzzle/next size={}", size);
         java.util.List<QuizResponse> response = puzzleService.getNextPuzzlesForCurrentUser(size);
         if (response.isEmpty()) {
             return ResponseEntity.noContent().build();
@@ -30,6 +31,7 @@ public class PuzzleController {
     public ResponseEntity<Void> markPuzzleAsViewed(
             @PathVariable Long id,
             @RequestBody Map<String, Boolean> body) {
+        log.info("Request received: POST /api/puzzle/{}/view", id);
 
         Boolean isCorrect = body.get("isCorrect");
         puzzleService.markPuzzleAsViewed(id, isCorrect);

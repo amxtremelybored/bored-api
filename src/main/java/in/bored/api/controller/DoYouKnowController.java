@@ -8,8 +8,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
+
 @RestController
 @RequestMapping("/api/doyouknow")
+@Slf4j
 public class DoYouKnowController {
 
     private final DoYouKnowService service;
@@ -20,6 +23,7 @@ public class DoYouKnowController {
 
     @GetMapping("/next")
     public ResponseEntity<List<DoYouKnowContent>> getNextFact(@RequestParam(defaultValue = "10") int size) {
+        log.info("Request received: GET /api/doyouknow/next size={}", size);
         List<DoYouKnowContent> content = service.getNextDoYouKnowForCurrentUser(size);
         if (content.isEmpty()) {
             return ResponseEntity.noContent().build();
@@ -30,6 +34,7 @@ public class DoYouKnowController {
     @PostMapping("/{id}/view")
     public ResponseEntity<Void> markFactAsViewed(@PathVariable Long id,
             @RequestBody(required = false) Map<String, Boolean> payload) {
+        log.info("Request received: POST /api/doyouknow/{}/view", id);
         Boolean isLiked = (payload != null) ? payload.get("isLiked") : null;
         service.markDoYouKnowAsViewed(id, isLiked);
         return ResponseEntity.ok().build();

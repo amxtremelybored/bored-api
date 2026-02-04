@@ -8,8 +8,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
+
 @RestController
 @RequestMapping("/api/joke")
+@Slf4j
 public class JokeController {
 
     private final JokeService jokeService;
@@ -20,6 +23,7 @@ public class JokeController {
 
     @GetMapping("/next")
     public ResponseEntity<List<JokeContent>> getNextJoke(@RequestParam(defaultValue = "10") int size) {
+        log.info("Request received: GET /api/joke/next size={}", size);
         List<JokeContent> joke = jokeService.getNextJokeForCurrentUser(size);
         if (joke.isEmpty()) {
             return ResponseEntity.noContent().build();
@@ -30,6 +34,7 @@ public class JokeController {
     @PostMapping("/{id}/view")
     public ResponseEntity<Void> markJokeAsViewed(@PathVariable Long id,
             @RequestBody(required = false) Map<String, Boolean> payload) {
+        log.info("Request received: POST /api/joke/{}/view", id);
         Boolean isLiked = (payload != null) ? payload.get("isLiked") : null;
         jokeService.markJokeAsViewed(id, isLiked);
         return ResponseEntity.ok().build();
