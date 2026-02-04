@@ -101,6 +101,9 @@ public class PuzzleService {
     }
 
     private void markAsViewedInternal(UserProfile user, PuzzleContent puzzle, Boolean isCorrect) {
+        if (viewRepository.existsByUserProfileAndPuzzleContent(user, puzzle)) {
+            return;
+        }
         try {
             UserPuzzleView view = new UserPuzzleView();
             view.setUserProfile(user);

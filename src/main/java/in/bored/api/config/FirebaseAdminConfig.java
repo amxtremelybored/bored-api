@@ -4,6 +4,7 @@ import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
@@ -12,6 +13,7 @@ import java.io.IOException;
 
 @Configuration
 @Profile("prod") // Only active for "local" profile
+@Slf4j
 public class FirebaseAdminConfig {
 
     private static final String FIREBASE_CREDENTIAL_PATH = "/app/bored/firebase-service-account.json";
@@ -25,10 +27,10 @@ public class FirebaseAdminConfig {
 
             if (FirebaseApp.getApps().isEmpty()) {
                 FirebaseApp.initializeApp(options);
-                System.out.println("✅ Firebase Admin initialized from: " + FIREBASE_CREDENTIAL_PATH);
+                log.info("✅ Firebase Admin initialized from: {}", FIREBASE_CREDENTIAL_PATH);
             }
         } catch (IOException e) {
-            System.err.println("❌ Firebase init failed: " + e.getMessage());
+            log.error("❌ Firebase init failed: {}", e.getMessage());
         }
     }
 }

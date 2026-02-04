@@ -4,6 +4,7 @@ import in.bored.api.dto.*;
 import in.bored.api.model.*;
 import in.bored.api.repo.*;
 import jakarta.persistence.EntityNotFoundException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,8 +14,10 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.time.OffsetDateTime;
+import java.util.Collections; // Added missing import
 
 @Service
+@Slf4j
 public class AdService {
 
     private final AdRepository adRepository;
@@ -23,6 +26,8 @@ public class AdService {
     private final UserProfileRepository userProfileRepository;
     private final BulkAdItemRepository bulkAdItemRepository;
     private final Random random = new Random();
+
+    private static final int BULK_AD_COOLDOWN_MINUTES = 60;
 
     public AdService(AdRepository adRepository,
             AdTargetingRuleRepository ruleRepository,
@@ -162,68 +167,88 @@ public class AdService {
 
     @Transactional
     public List<AdResponse> serveBulkAds(Long userProfileId) {
-        System.out.println("DEBUG: serveBulkAds called for user: " + userProfileId);
+        log.debug("serveBulkAds called for user: {}", userProfileId);
+        if (userProfileId == null) { // Assuming userProfileId is Long, not String
+            log.debug("serveBulkAds called with null userProfileId. Returning empty list.");
+            return Collections.emptyList();
+        }
+
         UserProfile user = userProfileRepository.findById(userProfileId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
         if (user.getSubscriptionType() != SubscriptionType.FREE) {
-            System.out.println("DEBUG: User is not FREE, returning empty list");
-            return new ArrayList<>();
+            log.debug("User {} is not FREE, returning empty list", userProfileId);
+            return Collections.emptyList();
         }
 
-        // Check Cooldown
-        OffsetDateTime lastShown = user.getLastBulkAdShownTime();
+        // 2) Cooldown Check
+        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime lastShown = user.getLastBulkAdShownTime(); // Use user object directly
+
         if (lastShown != null) {
-            java.time.Duration timeSince = java.time.Duration.between(lastShown, java.time.OffsetDateTime.now());
-            System.out.println(
-                    "DEBUG: Last bulk ad shown at: " + lastShown + ", Minutes since: " + timeSince.toMinutes());
-            if (timeSince.toMinutes() < 60) {
-                System.out.println("DEBUG: Cooldown ACTIVE. Returning empty list.");
-                return new ArrayList<>();
+            long minutesSince = java.time.Duration.between(lastShown, now).toMinutes();
+            log.debug("Last bulk ad shown {} mins ago for user {}", minutesSince, userProfileId);
+
+            if (minutesSince < BULK_AD_COOLDOWN_MINUTES) {
+                log.debug("Cooldown ACTIVE for user {}. Returning empty list.", userProfileId);
+                return Collections.emptyList();
             }
         } else {
-            System.out.println("DEBUG: First time bulk ad for this user (lastShown is null)");
+            log.debug("First time bulk ad for user {} (lastShown is null)", userProfileId);
         }
 
-        // Serve Bulk
-        List<BulkAdItem> bulkItems = bulkAdItemRepository.findByIsActiveTrueOrderBySortOrderAsc();
-        System.out.println("DEBUG: Found " + bulkItems.size() + " active bulk items configured.");
+        // 3) Retrieve Active Bulk Ads
+        // Assuming adRepository.findActiveBulkAds() is a new method or
+        // bulkAdItemRepository.findByIsActiveTrueOrderBySortOrderAsc()
+        // For now, sticking to existing bulkAdItemRepository logic to avoid introducing
+        // new undefined methods.
+        List<BulkAdItem> bulkItemsRaw = bulkAdItemRepository.findByIsActiveTrueOrderBySortOrderAsc();
+        List<Ad> bulkItems = bulkItemsRaw.stream().map(BulkAdItem::getAd).collect(Collectors.toList());
+        log.debug("Found {} active bulk items configured.", bulkItems.size());
 
         if (bulkItems.isEmpty()) {
-            System.out.println("DEBUG: No bulk items found in DB. Returning empty list.");
-            return new ArrayList<>();
+            log.debug("No bulk items found in DB. Returning empty list.");
+            return Collections.emptyList();
         }
 
+        // 4) Filter by Targeting (optional) & Time Slots
         List<AdResponse> result = new ArrayList<>();
-        java.time.LocalTime now = java.time.LocalTime.now(java.time.ZoneId.of("Asia/Kolkata"));
+        java.time.LocalTime localNow = java.time.LocalTime.now(java.time.ZoneId.of("Asia/Kolkata"));
 
-        for (BulkAdItem item : bulkItems) {
-            Ad ad = item.getAd();
-            if (!ad.isActive()) {
-                System.out.println("DEBUG: Ad " + ad.getId() + " is inactive, skipping.");
+        for (Ad ad : bulkItems) {
+            // Basic Status Check (redundant if repo query is correct, but safe)
+            if (!ad.isActive()) { // Assuming Ad has an isActive() method
+                log.debug("Ad {} is inactive, skipping.", ad.getId());
                 continue;
             }
 
-            // Check Time Slots
-            if (!isEligibleForTimeSlot(ad, now)) {
-                System.out.println("DEBUG: Ad " + ad.getId() + " not eligible for time slot " + now);
+            // Time Slot Check
+            if (!isEligibleForTimeSlot(ad, localNow)) { // Reusing existing method
+                log.debug("Ad {} not eligible for time slot {}", ad.getId(), localNow);
                 continue;
             }
 
+            // Targeting Check
             List<AdTargetingRule> rules = ruleRepository.findByAdId(ad.getId());
-            if (isEligible(user, rules)) {
-                System.out.println("DEBUG: Ad " + ad.getId() + " ELIGIBLE. Adding to result.");
+            if (isEligible(user, rules)) { // Reusing existing method
+                log.debug("Ad {} ELIGIBLE. Adding to result.", ad.getId());
                 recordImpression(user.getId(), ad.getId());
                 result.add(mapToAdResponse(ad));
             } else {
-                System.out.println("DEBUG: Ad " + ad.getId() + " targeting mismatch.");
+                // If targeting fails
+                log.debug("Ad {} targeting mismatch for user {}.", ad.getId(), userProfileId);
             }
         }
 
         if (result.isEmpty()) {
-            System.out.println("DEBUG: All bulk ads filtered out. Returning empty list.");
-            return new ArrayList<>();
+            log.debug("All bulk ads filtered out for user {}. Returning empty list.", userProfileId);
+            return Collections.emptyList();
         }
+
+        // Update Last Shown Time
+        log.debug("Explicitly updating lastBulkAdShownTime for user {}", userProfileId);
+        user.setLastBulkAdShownTime(java.time.OffsetDateTime.now(java.time.ZoneId.of("Asia/Kolkata")));
+        userProfileRepository.save(user);
 
         return result;
     }
@@ -233,7 +258,7 @@ public class AdService {
         UserProfile user = userProfileRepository.findById(userProfileId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
-        System.out.println("DEBUG: Explicitly updating lastBulkAdShownTime for user " + userProfileId);
+        log.debug("Explicitly updating lastBulkAdShownTime for user {}", userProfileId);
         user.setLastBulkAdShownTime(java.time.OffsetDateTime.now(java.time.ZoneId.of("Asia/Kolkata")));
         userProfileRepository.save(user);
     }
