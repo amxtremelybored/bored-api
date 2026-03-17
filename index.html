@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -27,10 +28,30 @@
 
         nav {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
+            align-items: flex-start;
             padding: 32px 64px;
             width: 100%;
+        }
+
+        .logo-group {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .logo-group h1 {
+            font-size: 50px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 0;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+
+        .logo-group h1:hover {
+            color: #2563eb;
         }
 
         .logo {
@@ -40,14 +61,15 @@
             cursor: pointer;
             transition: color 0.2s ease;
         }
-        
+
         .logo:hover {
             color: #000000;
         }
 
         .nav-links {
             display: flex;
-            gap: 36px;
+            flex-direction: column;
+            gap: 16px;
             list-style: none;
         }
 
@@ -72,7 +94,17 @@
             align-items: center;
             justify-content: center;
             text-align: center;
-            margin-top: -64px; /* Offset the nav height to truly center in viewport */
+            margin-top: -64px;
+            /* Offset the nav height to truly center in viewport */
+        }
+
+        h0 {
+            font-size: 100px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 24px;
+            transition: color 0.3s ease;
+            cursor: default;
         }
 
         h1 {
@@ -83,7 +115,7 @@
             transition: color 0.3s ease;
             cursor: default;
         }
-        
+
         h1:hover {
             color: #2563eb;
         }
@@ -94,12 +126,19 @@
             margin-bottom: 48px;
             font-family: "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
             animation: breathe 4s ease-in-out infinite;
-            filter: drop-shadow(0px 8px 16px rgba(0,0,0,0.08));
+            filter: drop-shadow(0px 8px 16px rgba(0, 0, 0, 0.08));
         }
 
         @keyframes breathe {
-            0%, 100% { transform: translateY(0px) scale(1); }
-            50% { transform: translateY(-8px) scale(1.02); }
+
+            0%,
+            100% {
+                transform: translateY(0px) scale(1);
+            }
+
+            50% {
+                transform: translateY(-8px) scale(1.02);
+            }
         }
 
         .google-play-btn {
@@ -112,13 +151,13 @@
             border-radius: 10px;
             gap: 14px;
             transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
         }
 
         .google-play-btn:hover {
             background-color: #1f2937;
             transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
         }
 
         .btn-icon svg {
@@ -156,22 +195,30 @@
                 gap: 24px;
                 padding: 24px;
             }
+
             .hero {
                 margin-top: 0;
             }
+
             h1 {
                 font-size: 48px;
             }
+
             .emoji {
                 font-size: 100px;
             }
         }
     </style>
 </head>
+
 <body>
 
     <nav>
-        <div class="logo">Treegen Technologies</div>
+        <div class="logo-group">
+            <div class="logo"><img src="assets/Treegen.png" alt="TreeGen Technologies" height="140" /></div>
+            <h1>Software Products Creation and Innovation</h1>
+            <div class="logo"><img src="assets/Treegen_Logo.png" alt="TreeGen Technologies" height="140" /></div>
+        </div>
         <ul class="nav-links">
             <li><a href="#">Home</a></li>
             <li><a href="#">Product</a></li>
@@ -181,16 +228,22 @@
     </nav>
 
     <main class="hero">
-        <h1>Bored</h1>
+        <h2>"Learning Made Easy"</h2>
+        <br>
+        <br>
+        <br>
+        <h0>Bored</h0>
         <div class="emoji">🥱</div>
-        
+
         <a href="#" class="google-play-btn">
             <div class="btn-icon">
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="#ffffff">
-                    <path d="M3.609 1.814L13.792 12 3.61 22.186a3.593 3.593 0 01-.61-2.022V3.836c0-.756.223-1.465.61-2.022z"/>
-                    <path d="M14.752 12.96L4.57 23.143l14.925-8.625-4.743-1.558z"/>
-                    <path d="M14.752 11.04l4.743-1.558L4.57.857 14.752 11.04z"/>
-                    <path d="M20.301 8.528l-5.549 1.82 5.549 1.82 2.668-1.542a1.868 1.868 0 00.912-1.619 1.87 1.87 0 00-.912-1.619l-2.668-1.542z"/>
+                    <path
+                        d="M3.609 1.814L13.792 12 3.61 22.186a3.593 3.593 0 01-.61-2.022V3.836c0-.756.223-1.465.61-2.022z" />
+                    <path d="M14.752 12.96L4.57 23.143l14.925-8.625-4.743-1.558z" />
+                    <path d="M14.752 11.04l4.743-1.558L4.57.857 14.752 11.04z" />
+                    <path
+                        d="M20.301 8.528l-5.549 1.82 5.549 1.82 2.668-1.542a1.868 1.868 0 00.912-1.619 1.87 1.87 0 00-.912-1.619l-2.668-1.542z" />
                 </svg>
             </div>
             <div class="btn-text">
@@ -198,7 +251,12 @@
                 <span class="large-text">Google Play</span>
             </div>
         </a>
+        <br>
+        <br>
+        <br>
+        <h2>When the going gets Bored, Bored gets going !!!</h2>
     </main>
 
 </body>
+
 </html>
