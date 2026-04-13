@@ -21,18 +21,14 @@ public class FunService {
     private final FunContentRepository contentRepository;
     private final UserFunViewRepository userViewRepository;
     private final UserProfileRepository userProfileRepository;
-    private final GeminiService geminiService;
-
     public FunService(FunCategoryRepository categoryRepository,
             FunContentRepository contentRepository,
             UserFunViewRepository userViewRepository,
-            UserProfileRepository userProfileRepository,
-            GeminiService geminiService) {
+            UserProfileRepository userProfileRepository) {
         this.categoryRepository = categoryRepository;
         this.contentRepository = contentRepository;
         this.userViewRepository = userViewRepository;
         this.userProfileRepository = userProfileRepository;
-        this.geminiService = geminiService;
     }
 
     public List<FunContent> getNextFunForCurrentUser(int count) {
@@ -43,21 +39,7 @@ public class FunService {
         }
 
         // 1. Try to find unseen fun items in DB
-        // 1. Try to find unseen fun items in DB
-        List<FunContent> existing = contentRepository.findRandomUnseen(user.getId(), count);
-        // 2. If not enough, generate new fun items via Gemini
-        if (existing.size() < count) {
-            // Calculate how many more we need, but maybe just generate a batch of 10 anyway
-            // to be safe/efficient
-            logger.info("Not enough unseen fun content for user {} (found {}), generating more...", user.getId(),
-                    existing.size());
-            generateAndSaveFun(10); // Deduplicates internally
-
-            // 3. Try fetching again
-            existing = contentRepository.findRandomUnseen(user.getId(), count);
-        }
-
-        List<FunContent> finalResult = existing;
+        List<FunContent> finalResult = contentRepository.findRandomUnseen(user.getId(), count);
 
         // 4. Mark all as served/viewed to prevent duplicates
         for (FunContent fc : finalResult) {
@@ -87,23 +69,7 @@ public class FunService {
         }
     }
 
-    private void generateAndSaveFun(int count) {
-        List<String> newItems = geminiService.generateFun(count);
-        if (newItems.isEmpty())
-            return;
 
-        // Ensure default category exists
-        FunCategory category = categoryRepository.findByName("Anecdotes")
-                .orElseGet(() -> categoryRepository.save(new FunCategory("Anecdotes", "Fun anecdotes and gags")));
-
-        for (String contentStr : newItems) {
-            java.util.Optional<FunContent> existing = contentRepository.findByContent(contentStr);
-            if (existing.isEmpty()) {
-                FunContent funContent = new FunContent(category.getId(), contentStr, "Gemini");
-                contentRepository.save(funContent);
-            }
-        }
-    }
 
     private UserProfile getCurrentUserProfile() {
         var auth = SecurityContextHolder.getContext().getAuthentication();

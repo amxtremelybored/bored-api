@@ -22,16 +22,12 @@ public class HealthWellnessService {
     private final HealthWellnessContentRepository contentRepository;
     private final HealthWellnessCategoryRepository categoryRepository;
     private final UserHealthWellnessViewRepository viewRepository;
-    private final GeminiService geminiService;
-
     public HealthWellnessService(HealthWellnessContentRepository contentRepository,
             HealthWellnessCategoryRepository categoryRepository,
-            UserHealthWellnessViewRepository viewRepository,
-            GeminiService geminiService) {
+            UserHealthWellnessViewRepository viewRepository) {
         this.contentRepository = contentRepository;
         this.categoryRepository = categoryRepository;
         this.viewRepository = viewRepository;
-        this.geminiService = geminiService;
     }
 
     @Transactional
@@ -48,37 +44,7 @@ public class HealthWellnessService {
         List<HealthWellnessContent> existing = contentRepository.findRandomUnseen(userProfileId, category.getId(),
                 count);
 
-        // 2. If not enough content, generate via Gemini
-        if (existing.size() < count) {
-            int needed = count - existing.size();
-            logger.info(
-                    "Not enough existing content (found {}), generating {} more via Gemini for user {} in category {}",
-                    existing.size(), needed, userProfileId, topic);
 
-            // Ask for a bit more to handle potential duplicates
-            List<String> newTips = geminiService.generateHealthWellnessTip(topic, Math.max(5, needed));
-
-            if (!newTips.isEmpty()) {
-                // 3. Save new content
-                for (String tipText : newTips) {
-                    // Check for duplicates
-                    Optional<HealthWellnessContent> existingTip = contentRepository.findByTip(tipText);
-                    if (existingTip.isPresent()) {
-                        // If it's a dry run, we might want to use it if we haven't seen it?
-                        // But findRandomUnseen should catch it on next pass.
-                        continue;
-                    }
-                    HealthWellnessContent content = new HealthWellnessContent();
-                    content.setCategory(category);
-                    content.setTip(tipText);
-                    content.setSource("Gemini");
-                    contentRepository.save(content);
-                }
-
-                // 4. Re-fetch to get the new ones (and any missed ones)
-                existing = contentRepository.findRandomUnseen(userProfileId, category.getId(), count);
-            }
-        }
 
         // 5. Mark as viewed
         for (HealthWellnessContent content : existing) {

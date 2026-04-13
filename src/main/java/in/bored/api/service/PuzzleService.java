@@ -31,7 +31,7 @@ public class PuzzleService {
     private final PuzzleContentRepository contentRepository;
     private final UserPuzzleViewRepository viewRepository;
     private final UserProfileRepository userProfileRepository;
-    private final GeminiService geminiService;
+
 
     @Transactional
     public java.util.List<QuizResponse> getNextPuzzlesForCurrentUser(int count) {
@@ -45,19 +45,7 @@ public class PuzzleService {
         List<PuzzleContent> unseen = contentRepository.findRandomUnseen(user.getId(), count);
         log.info("Found {} unseen puzzles in DB", unseen.size());
 
-        // 2. Fallback: Generate new puzzles via Gemini if needed
-        if (unseen.size() < count) {
-            int numToGen = Math.max(10, count - unseen.size());
-            log.info("Not enough unseen puzzles for user {}. Generating {} via Gemini...", user.getId(), numToGen);
-            java.util.List<PuzzleContent> generated = generateAndSavePuzzles(numToGen);
-            log.info("Generated {} new puzzles", generated.size());
 
-            if (generated != null && !generated.isEmpty()) {
-                // Re-fetch to ensure we have IDs and respect limit
-                unseen = contentRepository.findRandomUnseen(user.getId(), count);
-                log.info("After generation, found {} unseen puzzles in DB", unseen.size());
-            }
-        }
 
         // 5. Mark all as served/viewed to prevent duplicates
         for (PuzzleContent pc : unseen) {
@@ -115,48 +103,7 @@ public class PuzzleService {
         }
     }
 
-    private java.util.List<PuzzleContent> generateAndSavePuzzles(int count) {
-        // 1. Get or create default category
-        PuzzleCategory category = categoryRepository.findAll().stream()
-                .filter(c -> "Generic Puzzles".equals(c.getName()))
-                .findFirst()
-                .orElseGet(() -> {
-                    PuzzleCategory c = new PuzzleCategory();
-                    c.setId(UUID.randomUUID());
-                    c.setName("Generic Puzzles");
-                    c.setEmoji("🧩");
-                    c.setDescription("Fun generic puzzles!");
-                    return categoryRepository.save(c);
-                });
 
-        // 2. Call Gemini
-        List<QuizResponse> generated = geminiService.generatePuzzle(count);
-
-        if (generated.isEmpty())
-            return java.util.Collections.emptyList();
-
-        java.util.List<PuzzleContent> savedList = new java.util.ArrayList<>();
-
-        for (QuizResponse dto : generated) {
-            Optional<PuzzleContent> existing = contentRepository.findByQuestion(dto.getQuestion());
-            PuzzleContent content;
-
-            if (existing.isPresent()) {
-                content = existing.get();
-            } else {
-                content = new PuzzleContent();
-                content.setCategory(category);
-                content.setQuestion(dto.getQuestion());
-                content.setAnswer(dto.getAnswer());
-                content.setOptions(dto.getOptions()); // JSON string
-                content.setDifficultyLevel(1);
-                content = contentRepository.save(content);
-            }
-            savedList.add(content);
-        }
-
-        return savedList;
-    }
 
     private UserProfile getCurrentUserProfile() {
         String uid = getCurrentUid();

@@ -49,17 +49,12 @@ public class ContentFeedService {
     private final UserPreferenceRepository userPreferenceRepository;
     private final UserContentViewRepository userContentViewRepository;
     private final ContentCategoryRepository contentCategoryRepository;
-    private final GeminiService geminiService;
-    private final UserSearchLogRepository userSearchLogRepository;
-    private final UserTopicBookmarkRepository userTopicBookmarkRepository;
-
     public ContentFeedService(TopicContentRepository topicContentRepository,
             TopicRepository topicRepository,
             UserProfileRepository userProfileRepository,
             UserPreferenceRepository userPreferenceRepository,
             UserContentViewRepository userContentViewRepository,
             ContentCategoryRepository contentCategoryRepository,
-            GeminiService geminiService,
             UserSearchLogRepository userSearchLogRepository,
             UserTopicBookmarkRepository userTopicBookmarkRepository) {
         this.topicContentRepository = topicContentRepository;
@@ -68,7 +63,6 @@ public class ContentFeedService {
         this.userPreferenceRepository = userPreferenceRepository;
         this.userContentViewRepository = userContentViewRepository;
         this.contentCategoryRepository = contentCategoryRepository;
-        this.geminiService = geminiService;
         this.userSearchLogRepository = userSearchLogRepository;
         this.userTopicBookmarkRepository = userTopicBookmarkRepository;
     }
@@ -152,82 +146,6 @@ public class ContentFeedService {
         }
 
         if (contents.isEmpty()) {
-            // Fallback to Gemini if we have topics but no DB content
-            if (!topics.isEmpty()) {
-                // Pick a random topic from the resolved list
-                Topic fallbackTopic = topics.get(new java.util.Random().nextInt(topics.size()));
-                logger.info("⚠️ No DB content for user. Falling back to Gemini for topic: {}", fallbackTopic.getName());
-
-                String catName = (fallbackTopic.getCategory() != null) ? fallbackTopic.getCategory().getName()
-                        : "General";
-
-                List<ContentItemResponse> generatedItems = geminiService.generateContent(
-                        fallbackTopic.getName(),
-                        catName,
-                        size);
-
-                if (generatedItems.isEmpty()) {
-                    return Collections.emptyList();
-                }
-
-                // Calculate next content index
-                Integer maxIndex = topicContentRepository.findMaxContentIndexByTopic(fallbackTopic);
-                int nextIndex = (maxIndex == null) ? 0 : maxIndex + 1;
-
-                // Persist new content
-                List<TopicContent> newContents = new java.util.ArrayList<>();
-                for (ContentItemResponse item : generatedItems) {
-                    java.util.Optional<TopicContent> existing = topicContentRepository.findByTopicAndContent(
-                            fallbackTopic,
-                            item.getContent());
-                    if (existing.isPresent()) {
-                        newContents.add(existing.get());
-                    } else {
-                        TopicContent tc = new TopicContent();
-                        tc.setTopic(fallbackTopic);
-                        tc.setContent(item.getContent());
-                        tc.setContentIndex(nextIndex++);
-                        // prePersist will set createdAt
-                        newContents.add(topicContentRepository.save(tc));
-                    }
-                }
-                List<TopicContent> savedContents = newContents;
-
-                // Filter out items already seen by user
-                List<TopicContent> unseenContents = new java.util.ArrayList<>();
-                for (TopicContent tc : savedContents) {
-                    boolean seen = userContentViewRepository.findByUserProfileAndTopicContent_Id(profile, tc.getId())
-                            .isPresent();
-                    if (!seen) {
-                        unseenContents.add(tc);
-                    }
-                }
-
-                // Mark as viewed immediately
-                List<UserContentView> newViews = unseenContents.stream()
-                        .map(c -> {
-                            UserContentView v = new UserContentView();
-                            v.setUserProfile(profile);
-                            v.setTopicContent(c);
-                            v.setTopic(c.getTopic());
-                            return v;
-                        })
-                        .toList();
-
-                userContentViewRepository.saveAll(newViews);
-
-                // Return mapped response
-                List<ContentItemResponse> response = unseenContents.stream()
-                        .map(c -> {
-                            ContentItemResponse dto = this.toResponse(c);
-                            dto.setSource("Gemini");
-                            return dto;
-                        })
-                        .toList();
-
-                enrichContentItems(response, profile, null);
-                return response;
-            }
             return Collections.emptyList();
         }
 
@@ -344,90 +262,7 @@ public class ContentFeedService {
                     List.of(randomTopic),
                     pageable);
 
-            // If DB empty for this topic, try Gemini fallback
             if (contents.isEmpty()) {
-                logger.info("⚠️ No DB content for guest (random). Falling back to Gemini for topic: {}",
-                        randomTopic.getName());
-                String catName = (randomTopic.getCategory() != null) ? randomTopic.getCategory().getName() : "General";
-
-                List<ContentItemResponse> generatedItems = geminiService.generateContent(
-                        randomTopic.getName(),
-                        catName,
-                        size);
-
-                if (!generatedItems.isEmpty()) {
-                    // Calculate next content index
-                    Integer maxIndex = topicContentRepository.findMaxContentIndexByTopic(randomTopic);
-                    int nextIndex = (maxIndex == null) ? 0 : maxIndex + 1;
-
-                    // Persist new content
-                    List<TopicContent> newContents = new java.util.ArrayList<>();
-                    for (ContentItemResponse item : generatedItems) {
-                        java.util.Optional<TopicContent> existing = topicContentRepository
-                                .findByTopicAndContent(randomTopic, item.getContent());
-                        if (existing.isPresent()) {
-                            newContents.add(existing.get());
-                        } else {
-                            TopicContent tc = new TopicContent();
-                            tc.setTopic(randomTopic);
-                            tc.setContent(item.getContent());
-                            tc.setContentIndex(nextIndex++);
-                            tc.setCreatedAt(OffsetDateTime.now());
-                            newContents.add(topicContentRepository.save(tc));
-                        }
-                    }
-                    List<TopicContent> savedContents = newContents;
-
-                    // Update flags for Topic and Category
-                    OffsetDateTime now = OffsetDateTime.now();
-
-                    randomTopic.setContentLoaded(true);
-                    randomTopic.setContentLoadedAt(now);
-                    topicRepository.save(randomTopic);
-
-                    ContentCategory category = randomTopic.getCategory();
-                    if (category != null) {
-                        category.setContentLoaded(true);
-                        category.setContentLoadedAt(now);
-                        contentCategoryRepository.save(category);
-                    }
-
-                    // If guestUid provided, save views for generated content too!
-                    if (request != null && request.getGuestUid() != null && !request.getGuestUid().isEmpty()) {
-                        String guestUid = request.getGuestUid();
-                        List<TopicContent> unseenContents = new java.util.ArrayList<>();
-                        for (TopicContent tc : savedContents) {
-                            boolean seen = userContentViewRepository
-                                    .findByGuestUidAndTopicContent_Id(guestUid, tc.getId()).isPresent();
-                            if (!seen) {
-                                unseenContents.add(tc);
-                            }
-                        }
-                        savedContents = unseenContents; // Only return unseen
-
-                        List<UserContentView> views = new java.util.ArrayList<>();
-                        for (TopicContent tc : savedContents) {
-                            UserContentView view = new UserContentView();
-                            view.setGuestUid(request.getGuestUid()); // Set guest UID directly
-                            view.setUserProfile(null); // No profile for guests
-                            view.setTopicContent(tc);
-                            view.setTopic(tc.getTopic());
-                            views.add(view);
-                        }
-                        userContentViewRepository.saveAll(views);
-                    }
-
-                    List<ContentItemResponse> response = savedContents.stream()
-                            .map(tc -> {
-                                ContentItemResponse resp = toResponse(tc);
-                                resp.setSource("Gemini");
-                                return resp;
-                            })
-                            .toList();
-
-                    enrichContentItems(response, null, request != null ? request.getGuestUid() : null);
-                    return response;
-                }
                 return Collections.emptyList();
             }
 
@@ -465,90 +300,6 @@ public class ContentFeedService {
             contents = topicContentRepository.findRandomUnseenForGuest(topics, request.getGuestUid(), pageable);
         } else {
             contents = topicContentRepository.findRandomByTopicIn(topics, pageable);
-        }
-
-        // Fallback: If no content in DB, try Gemini (only if single topic requested)
-        if ((contents == null || contents.isEmpty()) && topics.size() == 1) {
-            Topic targetTopic = topics.get(0);
-            logger.info("⚠️ No DB content for guest (sticky). Falling back to Gemini for topic: {}",
-                    targetTopic.getName());
-            String catName = (targetTopic.getCategory() != null) ? targetTopic.getCategory().getName() : "General";
-
-            List<ContentItemResponse> generatedItems = geminiService.generateContent(
-                    targetTopic.getName(),
-                    catName,
-                    size);
-
-            if (!generatedItems.isEmpty()) {
-                Integer maxIndex = topicContentRepository.findMaxContentIndexByTopic(targetTopic);
-                int nextIndex = (maxIndex == null) ? 0 : maxIndex + 1;
-
-                List<TopicContent> newContents = new java.util.ArrayList<>();
-                for (ContentItemResponse item : generatedItems) {
-                    java.util.Optional<TopicContent> existing = topicContentRepository
-                            .findByTopicAndContent(targetTopic, item.getContent());
-                    if (existing.isPresent()) {
-                        newContents.add(existing.get());
-                    } else {
-                        TopicContent tc = new TopicContent();
-                        tc.setTopic(targetTopic);
-                        tc.setContent(item.getContent());
-                        tc.setContentIndex(nextIndex++);
-                        tc.setCreatedAt(OffsetDateTime.now());
-                        newContents.add(topicContentRepository.save(tc));
-                    }
-                }
-                List<TopicContent> savedContents = newContents;
-
-                // Update flags
-                OffsetDateTime now = OffsetDateTime.now();
-                targetTopic.setContentLoaded(true);
-                targetTopic.setContentLoadedAt(now);
-                topicRepository.save(targetTopic);
-
-                ContentCategory category = targetTopic.getCategory();
-                if (category != null) {
-                    category.setContentLoaded(true);
-                    category.setContentLoadedAt(now);
-                    contentCategoryRepository.save(category);
-                }
-
-                // Save history if guestUid present
-                if (request != null && request.getGuestUid() != null && !request.getGuestUid().isEmpty()) {
-                    String guestUid = request.getGuestUid();
-                    List<TopicContent> unseenContents = new java.util.ArrayList<>();
-                    for (TopicContent tc : savedContents) {
-                        boolean seen = userContentViewRepository.findByGuestUidAndTopicContent_Id(guestUid, tc.getId())
-                                .isPresent();
-                        if (!seen) {
-                            unseenContents.add(tc);
-                        }
-                    }
-                    savedContents = unseenContents;
-
-                    List<UserContentView> views = new java.util.ArrayList<>();
-                    for (TopicContent tc : savedContents) {
-                        UserContentView view = new UserContentView();
-                        view.setGuestUid(request.getGuestUid());
-                        view.setUserProfile(null);
-                        view.setTopicContent(tc);
-                        view.setTopic(tc.getTopic());
-                        views.add(view);
-                    }
-                    userContentViewRepository.saveAll(views);
-                }
-
-                List<ContentItemResponse> response = savedContents.stream()
-                        .map(tc -> {
-                            ContentItemResponse resp = toResponse(tc);
-                            resp.setSource("Gemini");
-                            return resp;
-                        })
-                        .toList();
-
-                enrichContentItems(response, null, request != null ? request.getGuestUid() : null);
-                return response;
-            }
         }
 
         if (contents == null || contents.isEmpty()) {
@@ -890,50 +641,7 @@ public class ContentFeedService {
             logger.error("Failed to log search query", e);
         }
 
-        // ⚡️ DIRECT AI SEARCH (No DB Topic Lookup)
-        try {
-            // 1. Get raw JSON from Gemini
-            String generatedJson = geminiService.generateContent(trimmedQuery, size);
-
-            // 2. Parse JSON to Objects
-            List<ContentItemResponse> generatedItems = geminiService.parseContent(generatedJson, trimmedQuery);
-
-            // Assign dummy IDs and Index to avoid Flutter Null check errors
-            long dummyIdCounter = System.currentTimeMillis();
-            int indexCounter = 0;
-
-            for (ContentItemResponse item : generatedItems) {
-                // Ensure ID is not null (Flutter expects int)
-                if (item.getId() == null) {
-                    item.setId(dummyIdCounter++);
-                }
-
-                // Ensure ContentIndex is not null
-                if (item.getContentIndex() == null) {
-                    item.setContentIndex(indexCounter++);
-                }
-
-                // Ensure TopicID is not null (use 0 or -1 for transient)
-                if (item.getTopicId() == null) {
-                    item.setTopicId(0L);
-                }
-
-                item.setSource("Gemini (Direct)");
-                item.setTopicName(trimmedQuery);
-                item.setTopicDisplayName("Search: " + trimmedQuery);
-
-                // Fix for Flutter Null check on createdAt
-                if (item.getCreatedAt() == null) {
-                    item.setCreatedAt(OffsetDateTime.now());
-                }
-            }
-
-            return generatedItems;
-
-        } catch (Exception e) {
-            logger.error("Direct search failed", e);
-            return Collections.emptyList();
-        }
+        return Collections.emptyList();
     }
 
     private ContentItemResponse mapToResponse(TopicContent tc) {

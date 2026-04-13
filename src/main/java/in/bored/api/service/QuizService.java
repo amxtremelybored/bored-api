@@ -25,18 +25,14 @@ public class QuizService {
     private final UserProfileRepository userProfileRepository;
 
     private final QuizCategoryRepository quizCategoryRepository;
-    private final GeminiService geminiService;
-
     public QuizService(QuizContentRepository quizContentRepository,
             UserQuizViewRepository userQuizViewRepository,
             UserProfileRepository userProfileRepository,
-            QuizCategoryRepository quizCategoryRepository,
-            GeminiService geminiService) {
+            QuizCategoryRepository quizCategoryRepository) {
         this.quizContentRepository = quizContentRepository;
         this.userQuizViewRepository = userQuizViewRepository;
         this.userProfileRepository = userProfileRepository;
         this.quizCategoryRepository = quizCategoryRepository;
-        this.geminiService = geminiService;
     }
 
     public java.util.List<QuizResponse> getNextQuizzesForCurrentUser(int count) {
@@ -45,76 +41,6 @@ public class QuizService {
         // 1. Try to find random unseen quiz from DB
         java.util.List<QuizContent> existing = quizContentRepository.findRandomUnseen(profile.getId(), count);
 
-        // 2. Fallback: Generate from Gemini if needed
-        if (existing.size() < count) {
-            // Retry loop to ensure we get enough unique content
-            int attempts = 0;
-            while (existing.size() < count && attempts < 3) {
-                attempts++;
-
-                // Pick a random category name or topic.
-                String topicName = "General Knowledge";
-                long catCount = quizCategoryRepository.count();
-                if (catCount > 0) {
-                    int idx = (int) (Math.random() * catCount);
-                    org.springframework.data.domain.Page<in.bored.api.model.QuizCategory> page = quizCategoryRepository
-                            .findAll(org.springframework.data.domain.PageRequest.of(idx, 1));
-                    if (page.hasContent()) {
-                        topicName = page.getContent().get(0).getName();
-                    }
-                }
-
-                // Generate batch
-                // We need (count - existing.size()) more, but let's ask for 10 at minimum to be
-                // safe
-                int numToGen = Math.max(10, count - existing.size());
-
-                // Use a larger random set number to vary content and avoid duplicates
-                int setNumber = (int) (Math.random() * 1000) + 1;
-
-                java.util.List<QuizResponse> generated = geminiService.generateQuiz(topicName, numToGen, setNumber);
-
-                if (!generated.isEmpty()) {
-                    // 3. Save generated quizzes
-                    String finalTopicName = topicName;
-                    in.bored.api.model.QuizCategory category = quizCategoryRepository.findAll().stream()
-                            .filter(c -> c.getName().equalsIgnoreCase(finalTopicName))
-                            .findFirst()
-                            .orElseGet(() -> {
-                                in.bored.api.model.QuizCategory newCat = new in.bored.api.model.QuizCategory();
-                                newCat.setName(finalTopicName);
-                                newCat.setEmoji("❓"); // Default emoji
-                                return quizCategoryRepository.save(newCat);
-                            });
-
-                    int savedCount = 0;
-                    for (QuizResponse dto : generated) {
-                        Optional<QuizContent> dupeCheck = quizContentRepository.findByQuestion(dto.getQuestion());
-                        if (dupeCheck.isEmpty()) {
-                            QuizContent qc = new QuizContent();
-                            qc.setCategory(category);
-                            qc.setQuestion(dto.getQuestion());
-                            qc.setAnswer(dto.getAnswer());
-                            qc.setOptions(dto.getOptions());
-                            qc.setDifficultyLevel(dto.getDifficultyLevel());
-                            quizContentRepository.save(qc);
-                            savedCount++;
-                        }
-                    }
-
-                    // 4. Refetch to get IDs and any missed ones (and update existing count for loop
-                    // condition)
-                    existing = quizContentRepository.findRandomUnseen(profile.getId(), count);
-
-                    // If we found enough now, break
-                    if (existing.size() >= count) {
-                        break;
-                    }
-                    // If we didn't save any new ones, maybe items were duplicates. Try again with
-                    // next loop (diff setNumber)
-                }
-            }
-        }
 
         // 5. Mark all as served/viewed to prevent duplicates
         for (QuizContent qc : existing) {

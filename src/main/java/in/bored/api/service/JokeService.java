@@ -21,18 +21,14 @@ public class JokeService {
     private final JokeContentRepository contentRepository;
     private final UserJokeViewRepository userViewRepository;
     private final UserProfileRepository userProfileRepository;
-    private final GeminiService geminiService;
-
     public JokeService(JokeCategoryRepository categoryRepository,
             JokeContentRepository contentRepository,
             UserJokeViewRepository userViewRepository,
-            UserProfileRepository userProfileRepository,
-            GeminiService geminiService) {
+            UserProfileRepository userProfileRepository) {
         this.categoryRepository = categoryRepository;
         this.contentRepository = contentRepository;
         this.userViewRepository = userViewRepository;
         this.userProfileRepository = userProfileRepository;
-        this.geminiService = geminiService;
     }
 
     public List<JokeContent> getNextJokeForCurrentUser(int count) {
@@ -43,18 +39,7 @@ public class JokeService {
         }
 
         // 1. Try to find unseen jokes in DB
-        List<JokeContent> existing = contentRepository.findRandomUnseen(user.getId(), count);
-        // 2. If not enough, generate new jokes via Gemini
-        if (existing.size() < count) {
-            logger.info("Not enough unseen jokes for user {} (found {}), generating more...", user.getId(),
-                    existing.size());
-            generateAndSaveJokes(10); // Deduplicates internally
-
-            // 3. Try fetching again (should return new unseen, or existing unseen)
-            existing = contentRepository.findRandomUnseen(user.getId(), count);
-        }
-
-        List<JokeContent> finalResult = existing;
+        List<JokeContent> finalResult = contentRepository.findRandomUnseen(user.getId(), count);
 
         // 4. Mark all as served/viewed to prevent duplicates
         for (JokeContent jc : finalResult) {
@@ -84,24 +69,7 @@ public class JokeService {
         }
     }
 
-    private void generateAndSaveJokes(int count) {
-        List<JokeContent> newJokes = geminiService.generateJoke(count);
-        if (newJokes.isEmpty())
-            return;
 
-        // Ensure default category exists
-        JokeCategory category = categoryRepository.findByName("Generic Jokes")
-                .orElseGet(() -> categoryRepository.save(new JokeCategory("Generic Jokes", "General purpose jokes")));
-
-        for (JokeContent joke : newJokes) {
-            java.util.Optional<JokeContent> existing = contentRepository.findBySetupAndPunchline(joke.getSetup(),
-                    joke.getPunchline());
-            if (existing.isEmpty()) {
-                joke.setCategoryId(category.getId());
-                contentRepository.save(joke);
-            }
-        }
-    }
 
     private UserProfile getCurrentUserProfile() {
         var auth = SecurityContextHolder.getContext().getAuthentication();

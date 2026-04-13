@@ -22,18 +22,14 @@ public class DoYouKnowService {
     private final DoYouKnowContentRepository contentRepository;
     private final UserDoYouKnowViewRepository userViewRepository;
     private final UserProfileRepository userProfileRepository;
-    private final GeminiService geminiService;
-
     public DoYouKnowService(DoYouKnowCategoryRepository categoryRepository,
             DoYouKnowContentRepository contentRepository,
             UserDoYouKnowViewRepository userViewRepository,
-            UserProfileRepository userProfileRepository,
-            GeminiService geminiService) {
+            UserProfileRepository userProfileRepository) {
         this.categoryRepository = categoryRepository;
         this.contentRepository = contentRepository;
         this.userViewRepository = userViewRepository;
         this.userProfileRepository = userProfileRepository;
-        this.geminiService = geminiService;
     }
 
     public List<DoYouKnowContent> getNextDoYouKnowForCurrentUser(int count) {
@@ -44,19 +40,7 @@ public class DoYouKnowService {
         }
 
         // 1. Try to find unseen facts in DB
-        // 1. Try to find unseen facts in DB
-        List<DoYouKnowContent> existing = contentRepository.findRandomUnseen(user.getId(), count);
-        // 2. If not enough, generate new facts via Gemini
-        if (existing.size() < count) {
-            logger.info("Not enough unseen facts for user {} (found {}), generating more...", user.getId(),
-                    existing.size());
-            generateAndSaveDoYouKnow(10); // Deduplicates internally
-
-            // 3. Try fetching again
-            existing = contentRepository.findRandomUnseen(user.getId(), count);
-        }
-
-        List<DoYouKnowContent> finalResult = existing;
+        List<DoYouKnowContent> finalResult = contentRepository.findRandomUnseen(user.getId(), count);
 
         // 4. Mark all as served/viewed to prevent duplicates
         for (DoYouKnowContent dc : finalResult) {
@@ -97,24 +81,7 @@ public class DoYouKnowService {
         }
     }
 
-    private void generateAndSaveDoYouKnow(int count) {
-        List<String> newItems = geminiService.generateDoYouKnow(count);
-        if (newItems.isEmpty())
-            return;
 
-        // Ensure default category exists
-        DoYouKnowCategory category = categoryRepository.findByName("General Facts")
-                .orElseGet(() -> categoryRepository
-                        .save(new DoYouKnowCategory("General Facts", "Interesting general knowledge facts")));
-
-        for (String fact : newItems) {
-            java.util.Optional<DoYouKnowContent> existing = contentRepository.findByFact(fact);
-            if (existing.isEmpty()) {
-                DoYouKnowContent content = new DoYouKnowContent(category.getId(), fact, "Gemini");
-                contentRepository.save(content);
-            }
-        }
-    }
 
     private UserProfile getCurrentUserProfile() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
