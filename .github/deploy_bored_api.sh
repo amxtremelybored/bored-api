@@ -6,11 +6,10 @@ set -euo pipefail
 #########################
 
 # Where the repo should live on the server
-REPO_DIR="/home/ira/project/bored/bored-api"
+REPO_DIR="/home/bored/project/api/bored-api"
 
 # Your remote Git URL
 GIT_URL="https://github.com/amxtremelybored/bored-api.git"
-
 BRANCH="main"
 
 # Docker image / container names
@@ -18,11 +17,17 @@ IMAGE_NAME="bored-api:latest"
 CONTAINER_NAME="bored-api"
 
 # Use existing network
-NETWORK_NAME="kiring-quantum"
+NETWORK_NAME="bored-net"
 
-# Host port -> container port (matches EXPOSE 7082 in Dockerfile)
+# Host port -> container port
 HOST_PORT=7082
 CONTAINER_PORT=7082
+
+# Env file with secrets (GEMINI_API_KEY, DB_*)
+ENV_FILE="/home/bored/secrets/bored-api.env"
+
+# Firebase service account JSON on host
+FIREBASE_JSON="/home/bored/secrets/firebase-service-account.json"
 
 #########################
 # 1) CLONE / UPDATE GIT #
@@ -67,8 +72,6 @@ elif command -v gradle >/dev/null 2>&1; then
   gradle clean bootJar
 else
   echo "❌ No Gradle wrapper (./gradlew) or system 'gradle' found."
-  echo "   - If this is a Gradle project, run 'gradle wrapper' in the project root and commit gradlew."
-  echo "   - Or install Gradle on the server and re-run this script."
   exit 1
 fi
 
@@ -101,7 +104,23 @@ else
 fi
 
 #########################
-# 6) RUN NEW CONTAINER  #
+# 6) CHECK SECRETS      #
+#########################
+
+if [ ! -f "$ENV_FILE" ]; then
+  echo "❌ Env file not found: $ENV_FILE"
+  echo "   Create it with GEMINI_API_KEY and DB_* variables."
+  exit 1
+fi
+
+if [ ! -f "$FIREBASE_JSON" ]; then
+  echo "❌ Firebase JSON not found: $FIREBASE_JSON"
+  echo "   Place your firebase-service-account.json there."
+  exit 1
+fi
+
+#########################
+# 7) RUN NEW CONTAINER  #
 #########################
 
 echo "🚀 Starting new container: $CONTAINER_NAME ..."
@@ -110,7 +129,11 @@ docker run -d \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \
   --network "$NETWORK_NAME" \
-  -p "${HOST_PORT}:${CONTAINER_PORT}" \
+  --env-file "$ENV_FILE" \
+  -e "GOOGLE_APPLICATION_CREDENTIALS=/app/bored/firebase-service-account.json" \
+  -v "$FIREBASE_JSON:/app/bored/firebase-service-account.json:ro" \
+  -v "/home/bored/ad:/home/bored/ad" \
+  -p "127.0.0.1:${HOST_PORT}:${CONTAINER_PORT}" \
   "$IMAGE_NAME"
 
-echo "✅ Deploy complete. bored-api is running on port ${HOST_PORT}."
+echo "✅ Deploy complete. bored-api is running on 127.0.0.1:${HOST_PORT}."

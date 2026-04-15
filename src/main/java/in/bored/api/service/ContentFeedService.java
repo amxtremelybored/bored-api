@@ -49,6 +49,9 @@ public class ContentFeedService {
     private final UserPreferenceRepository userPreferenceRepository;
     private final UserContentViewRepository userContentViewRepository;
     private final ContentCategoryRepository contentCategoryRepository;
+    private final UserSearchLogRepository userSearchLogRepository;
+    private final UserTopicBookmarkRepository userTopicBookmarkRepository;
+
     public ContentFeedService(TopicContentRepository topicContentRepository,
             TopicRepository topicRepository,
             UserProfileRepository userProfileRepository,
